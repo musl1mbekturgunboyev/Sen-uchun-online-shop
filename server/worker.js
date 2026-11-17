@@ -33,6 +33,7 @@ async function dispatch(request,env){
  const origin=request.headers.get('Origin');
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
+ if(['/api/gifts','/api/track','/api/admin/gifts','/api/admin/stage'].includes(p))return giftRoute(request,env,p);
  if(p==='/api/my-orders'&&method==='GET')return customerOrders(request,env);
  if(p==='/api/orders'&&method==='POST')return acceptOrder(request,env);
  if(p==='/api/admin/orders'&&method==='GET'){

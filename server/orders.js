@@ -15,7 +15,7 @@ async function customerOrders(request, env) {
  if(!hash)return json({},401);
  const before=new URL(request.url).searchParams.get('before')||'9223372036854775807';
  if(!/^\d{1,19}$/.test(before))return json({},400);
- const rows=await env.DB.prepare('SELECT rowid AS cursor,id,created,product,qty FROM orders WHERE customer_hash=? AND rowid<CAST(? AS INTEGER) ORDER BY rowid DESC LIMIT 41').bind(hash,before).all();
+ const rows=await env.DB.prepare('SELECT rowid AS cursor,id,created,product,qty,stage,tracking FROM orders WHERE customer_hash=? AND rowid<CAST(? AS INTEGER) ORDER BY rowid DESC LIMIT 41').bind(hash,before).all();
  return json({orders:rows.results.slice(0,40), more:rows.results.length>40});
 }
 async function acceptOrder(request,env){
@@ -27,12 +27,12 @@ async function acceptOrder(request,env){
  if(typeof id!=='string'||!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/.test(id)||!Number.isInteger(qty)||qty<1||qty>999||typeof note!=='string'||note.length>700||typeof contact!=='string'||contact.length>100)return json({error:'Buyurtma ma’lumotlarini tekshiring.'},400);
  const hash=await customerHash(request);
  if(request.headers.has('X-Order-Key')&&!hash)return json({},400);
- const receipt=row=>row.customer_hash===hash?json({id}):json({error:'Buyurtma raqami band.'},409);
- const existing=()=>env.DB.prepare('SELECT customer_hash FROM orders WHERE id=?').bind(id).first();
+ const receipt=row=>row.customer_hash===hash?json({id,tracking:row.tracking}):json({error:'Buyurtma raqami band.'},409);
+ const existing=()=>env.DB.prepare('SELECT customer_hash,tracking FROM orders WHERE id=?').bind(id).first();
  const prior=await existing();if(prior)return receipt(prior);
  const productId=f.get('product');
  if(typeof productId!=='string'||!/^\d+$/.test(productId))return json({},400);
- const product=await env.DB.prepare('SELECT name,visible FROM products WHERE id=?').bind(Number(productId)).first()??initial[Number(productId)];
+ const product=await env.DB.prepare('SELECT name,visible,price FROM products WHERE id=?').bind(Number(productId)).first()??initial[Number(productId)];
  if(!product?.visible)return json({error:'Mahsulot katalogda mavjud emas.'},400);
  const file=f.get('photo');let bytes,mime='',filename='';
  if(file!==null){
@@ -41,21 +41,27 @@ async function acceptOrder(request,env){
   if(!mime)return json({error:'JPG, PNG yoki WebP rasm tanlang.'},415);
   filename=file.name.replace(/[\x00-\x1f/\\]/g,'_').slice(0,180)||'surat';
  }
+ let gift=null;
+ if(f.has('gift')){
+  try{gift=await calculateGift(f.get('gift'),env,product,Number(productId),qty,!!bytes);}
+  catch{return json({error:'Sozlamalar yoki narx yangilangan. Sahifani yangilang va tanlovlarni tekshiring.'},400);}
+ }
+ const tracking=crypto.randomUUID();
  const key=bytes?'orders/'+crypto.randomUUID():null;
  if(key)await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});
  try{
-  await env.DB.prepare('INSERT INTO orders(id,created,product,qty,note,contact,filename,mime,size,object_key,customer_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(id,Date.now(),product.name,qty,note,contact,filename,mime,bytes?.length||0,key,hash).run();
+  await env.DB.prepare('INSERT INTO orders(id,created,product,qty,note,contact,filename,mime,size,object_key,customer_hash,tracking,stage,gift) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,Date.now(),product.name,qty,note,contact,filename,mime,bytes?.length||0,key,hash,tracking,stages[0],gift?JSON.stringify(gift):null).run();
  }catch(e){
-  const saved=await env.DB.prepare('SELECT object_key,customer_hash FROM orders WHERE id=?').bind(id).first();
+  const saved=await env.DB.prepare('SELECT object_key,customer_hash,tracking FROM orders WHERE id=?').bind(id).first();
   if(key&&saved?.object_key!==key)await env.BUCKET.delete(key);
   if(saved)return receipt(saved);throw e;
  }
  if(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_ADMIN_CHAT_ID&&file){
   const upload=new FormData();upload.set('chat_id',env.TELEGRAM_ADMIN_CHAT_ID);upload.set('document',file,filename);
   upload.set('caption',(product.name+' — '+qty+' dona\n'+note+'\n'+contact+'\n#'+id.slice(0,8)).slice(0,1024));
-  try{const r=await fetch('https://api.telegram.org/bot'+env.TELEGRAM_BOT_TOKEN+'/sendDocument',{method:'POST',body:upload});return json({id,telegram:r.ok});}catch{return json({id,telegram:false});}
+  try{const r=await fetch('https://api.telegram.org/bot'+env.TELEGRAM_BOT_TOKEN+'/sendDocument',{method:'POST',body:upload});return json({id,tracking,telegram:r.ok});}catch{return json({id,tracking,telegram:false});}
  }
- return json({id});
+ return json({id,tracking});
 }
 async function orderPhoto(env,id,download){
  const db=env.DB;

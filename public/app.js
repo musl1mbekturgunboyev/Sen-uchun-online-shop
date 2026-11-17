@@ -19,7 +19,7 @@ const fav=read('fav'),bag=read('bag');
 function toggle(set,key,id){if(set.has(id))set.delete(id);else set.add(id);try{localStorage.setItem('sen-'+key,JSON.stringify([...set]));}catch{}}
 function showOrder(id){
  orderId=crypto.randomUUID();get('orderError').textContent='';selectedId=id;const item=services.find(p=>p.id===id);if(!item)return;service=item.name+(item.price===null?'':' ('+item.price.toLocaleString()+' so‘m)');track('open',id); get('form').reset();clearPreview();get('title').textContent=service;
- get('ready').hidden=true;get('form').hidden=false;dialog.showModal();
+ get('ready').hidden=true;get('form').hidden=false;dialog.showModal();setupGift(item);
 }
 function notify(msg){get('toast').textContent=msg;get('toast').classList.add('show');clearTimeout(timer);timer=setTimeout(()=>get('toast').classList.remove('show'),1400);}
 function select(view,category=''){closeCatalog();mode=view;group=category;get('search').value='';render();if(view==='home')window.scrollTo({top:0});else get('katalog').scrollIntoView({block:'start'});}
@@ -91,12 +91,14 @@ get('form').onsubmit=async e=>{
  const button=get('submitOrder');if(button.disabled)return;button.disabled=true;button.textContent='Yuborilmoqda…';get('orderError').textContent='';
  const pendingId=orderId;
  try{
+  form.set('gift',checkoutGift());
   const r=await fetch('/api/orders',{method:'POST',headers:{'X-Order-Key':await orderHistoryKey()},body:form});const saved=await r.json();if(!r.ok)throw Error(saved.error||'Buyurtma yuborilmadi.');
   if(pendingId!==orderId)return;
   const link=new URL('/api/admin/orders/'+saved.id+'/photo',location.origin).href;
   message=['Assalomu alaykum! Sen uchun buyurtmam #'+saved.id.slice(0,8),service+' — '+qty+' dona.',note&&'Matn: '+note,file&&'Asl surat: '+link].filter(Boolean).join('\n');
   get('details').textContent=service+' — '+qty+' dona. Buyurtma № '+saved.id.slice(0,8);
   get('details').textContent+=' Keyin «Buyurtmalarim» bo‘limida ko‘rishingiz mumkin.';
+  get('trackReceipt').hidden=!saved.tracking;if(saved.tracking)get('trackReceipt').href=trackingLink(saved.tracking);
   get('send').href='https://t.me/Life_Uz1?text='+encodeURIComponent(message);
   get('hint').textContent=file?'Asl surat sotuvchining admin paneliga yetkazildi.':'Sotuvchi buyurtmani admin panelda ko‘radi.';
   const share=get('sharePhoto');share.hidden=!(file&&navigator.canShare?.({files:[file]}));

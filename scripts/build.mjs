@@ -15,7 +15,7 @@ for(const file of fs.readdirSync('public',{recursive:true})){
 const admin=fs.readFileSync('server/admin.html','utf8');
 const script=admin.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
 const adminScriptHash="'sha256-"+createHash('sha256').update(script).digest('base64')+"'";
-const source=['security','orders','worker'].map(name=>fs.readFileSync('server/'+name+'.js','utf8'));
+const source=['security','gifts','orders','worker'].map(name=>fs.readFileSync('server/'+name+'.js','utf8'));
 const directory=standalone?'dist/cloudflare':'dist/server';
 fs.mkdirSync(directory,{recursive:true});
 fs.writeFileSync(directory+'/index.js',[

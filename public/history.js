@@ -39,6 +39,8 @@ async function orderHistoryKey() {
         const row = document.createElement('li');
         const date = new Date(order.created).toLocaleDateString('uz-UZ');
         row.textContent = order.product + ' — ' + order.qty + ' dona · ' + date + ' · № ' + order.id.slice(0,8);
+        row.append(' · '+(order.stage||'Avvalgi buyurtma'));
+        if(order.tracking){const link=document.createElement('a');link.href=trackingLink(order.tracking);link.textContent='Kuzatish';row.append(' · ',link);}
         rows.append(row);
         cursor = order.cursor;
       }
