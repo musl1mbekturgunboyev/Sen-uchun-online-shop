@@ -1,3 +1,13 @@
 [build]
   command = "node scripts/netlify.mjs"
   publish = "dist/netlify"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Content-Security-Policy = "script-src 'self'; object-src 'none'; base-uri 'self'"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Content-Security-Policy = "script-src 'self'; object-src 'none'; base-uri 'self'"
