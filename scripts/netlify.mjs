@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+const value = process.env.SHOP_API_ORIGIN;
+if (!value) throw new Error('Netlify muhitida SHOP_API_ORIGIN ga Cloudflare Worker HTTPS manzilini kiriting.');
+const url = new URL(value);
+if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error('SHOP_API_ORIGIN toza HTTPS manzili bo‘lishi kerak.');
+const output = 'dist/netlify';
+fs.rmSync(output,{recursive:true,force:true});
+fs.cpSync('public',output,{recursive:true});
+const paths=['/api/*','/admin','/catalog-media/*','/product-image/*'];
+const rules=paths.map(path=>path+' '+url.origin+path.replace('*',':splat')+' 200!');
+fs.writeFileSync(output+'/_redirects',rules.join('\n')+'\n');

@@ -1,0 +1,51 @@
+<!doctype html><html lang="uz"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Boshqaruv · Sen uchun</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/design.css"><main class="wrap dashboard"><a href="/">← Do‘konga qaytish</a><h1>Do‘kon boshqaruvi</h1><section><div class="heading"><h2>Buyurtmalar</h2><button id="reloadOrders">Yangilash</button></div><div id="inbox"></div><button id="older" hidden>Oldingi buyurtmalar</button></section><h2>So‘nggi 30 kun</h2><div class="stats" id="stats"></div><p>Telegramga o‘tish tugma bosilganini bildiradi. Do‘kon egasining tashriflari statistikaga kiritilmaydi.</p><details><summary>Mahsulotlar bo‘yicha faollik</summary><div id="breakdown"></div></details><div class="heading"><h2>Mahsulotlar</h2><button class="primary" id="new">+ Mahsulot qo‘shish</button></div><div id="items"></div><p id="status" role="status"></p></main>
+<dialog id="editor"><form><button type="button" id="cancel" class="close" aria-label="Yopish">×</button><h2 id="title"></h2><label>Mahsulot nomi<input name="name" required maxlength="100"></label><label>Turkum<input name="category" list="categories" required maxlength="60"></label><datalist id="categories"></datalist><label>Tavsif<textarea name="description" required maxlength="350"></textarea></label><label>Narx (so‘m)<input name="price" type="number" min="0" max="1000000000000" step="1" placeholder="Bo‘sh qolsa, narx kelishiladi"></label><label>Mahsulot rasmlari (1–10 ta)<input multiple name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="samples" class="samples"></div><label><input name="visible" type="checkbox" style="display:inline;width:auto"> Katalogda ko‘rsatish</label><p id="error" role="alert"></p><button class="primary" id="save">Saqlash</button></form></dialog>
+<script type="module">
+const el=id=>document.getElementById(id),form=document.querySelector('form');let products=[],current,images=[];
+const names={view:'Sahifa ochilishi',open:'Buyurtma oynasi ochilishi',telegram:'Telegramga o‘tish'};
+function node(tag,text){const x=document.createElement(tag);x.textContent=text;return x}
+async function load(){
+ const r=await fetch('/api/admin');if(!r.ok)throw Error('Ma’lumotlarni yuklab bo‘lmadi.');
+ const data=await r.json();products=data.products;
+ el('items').replaceChildren();el('stats').replaceChildren();el('breakdown').replaceChildren();el('categories').replaceChildren();
+ for(const cat of new Set(products.map(p=>p.category))){const option=node('option',cat);option.value=cat;el('categories').append(option);}
+ for(const [kind,label] of Object.entries(names)){const box=node('section','');box.append(node('strong',data.stats.filter(x=>x.kind===kind).reduce((sum,row)=>sum+row.hits,0)),node('span',label));el('stats').append(box);}
+ for(const p of products){const row=node('div','');row.className='adminrow';row.append(node('b',p.name),node('span',p.visible?(p.price===null?'Narx kelishiladi':p.price.toLocaleString()+' so‘m'):'Yashirilgan'));
+ const edit=node('button','Tahrirlash');edit.onclick=()=>open(p);row.append(edit);el('items').append(row);
+ const hits=kind=>data.stats.filter(x=>x.product===p.id&&x.kind===kind).reduce((sum,row)=>sum+row.hits,0);
+ el('breakdown').append(node('p',p.name+' · Buyurtma oynasi: '+hits('open')+' · Telegram: '+hits('telegram')));}
+}
+function open(p){current=p;form.reset();images=[...(p?.images||[])];drawPhotos();
+ el('title').textContent=p?'Mahsulotni tahrirlash':'Yangi mahsulot';for(const k of ['name','description','category','price'])form.elements[k].value=p?.[k]??'';
+ form.elements.visible.checked=p?!!p.visible:true;el('error').textContent='';el('editor').showModal();}
+el('new').onclick=()=>open(null);el('cancel').onclick=()=>el('editor').close();
+function drawPhotos(){
+ el('samples').replaceChildren();
+ images.forEach((src,index)=>{const tile=node('div','');const img=document.createElement('img');img.src=src;img.alt=(index+1)+'-rasm';const remove=node('button','×');remove.type='button';remove.setAttribute('aria-label',(index+1)+'-rasmni olib tashlash');remove.onclick=()=>{images.splice(index,1);drawPhotos()};tile.append(img,remove);el('samples').append(tile);});
+}
+async function compress(file){
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('JPG, PNG yoki WebP rasm tanlang.');
+ const bitmap=await createImageBitmap(file);
+ try{for(const width of [1500,1150,850,620]){
+ const scale=Math.min(1,width/Math.max(bitmap.width,bitmap.height));const c=document.createElement('canvas');
+ c.width=Math.max(1,Math.round(bitmap.width*scale));c.height=Math.max(1,Math.round(bitmap.height*scale));c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);
+ const data=c.toDataURL('image/webp',.81);if(data.length<=105000)return data;
+ }throw Error('Rasmni kichraytirib qayta tanlang.');}finally{bitmap.close();}
+}
+form.elements.photo.onchange=async e=>{const input=e.target,files=[...input.files];input.value='';
+ if(images.length+files.length>10){el('error').textContent='Bitta mahsulotga ko‘pi bilan 10 ta rasm qo‘shiladi.';return;}
+ const target=images;input.disabled=el('save').disabled=true;try{const next=[];for(const f of files)next.push(await compress(f));if(target===images){images.push(...next);drawPhotos();el('error').textContent='';}}catch(err){el('error').textContent=err.message;}finally{input.disabled=el('save').disabled=false;}};
+form.onsubmit=async e=>{e.preventDefault();if(!images.length){el('error').textContent='Mahsulot rasmini tanlang.';return}
+ const f=form.elements;el('save').disabled=true;try{const r=await fetch('/api/admin/product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:current?.id??null,revision:current?.revision??0,name:f.name.value,category:f.category.value,description:f.description.value,price:f.price.value===''?null:Number(f.price.value),images,visible:Number(f.visible.checked)})});
+ if(!r.ok)throw Error((await r.json()).error||'Saqlanmadi');el('editor').close();await load();el('status').textContent='Mahsulot saqlandi.';}catch(err){el('error').textContent=err.message;el('status').textContent=err.message;}finally{el('save').disabled=false;}};
+let cursor;
+async function inbox(append=false){
+ const list=el('inbox');try{const r=await fetch('/api/admin/orders'+(append?'?before='+cursor:''));if(!r.ok)throw Error();const rows=await r.json();if(!append)list.replaceChildren();
+ if(!rows.length&&!append)list.append(node('p','Hozircha buyurtma yo‘q.'));
+ for(const o of rows){const row=node('section','');row.className='adminrow';const info=node('div','');info.append(node('b',o.product+' — '+o.qty+' dona'),node('p',new Date(o.created).toLocaleString()+' · № '+o.id.slice(0,8)),node('p',o.note),node('p',o.contact));row.append(info);
+ if(o.size){const url='/api/admin/orders/'+o.id+'/photo',link=node('a',''),img=document.createElement('img');img.src=url;img.loading='lazy';img.alt='Buyurtma surati';img.width=85;link.href=url;link.target='_blank';link.rel='noopener';link.append(img);const dl=node('a','Asl suratni yuklab olish');dl.href=url+'?download=1';row.append(link,dl);}list.append(row);}
+ cursor=rows.at(-1)?.cursor;el('older').hidden=rows.length<40;
+ }catch{el('status').textContent='Buyurtmalar yuklanmadi. Yangilashni bosing.';}}
+el('reloadOrders').onclick=()=>inbox();el('older').onclick=()=>inbox(true);inbox();
+load().catch(e=>el('status').textContent=e.message);
+</script></html>
