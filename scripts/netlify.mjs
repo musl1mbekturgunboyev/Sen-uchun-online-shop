@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+fs.writeFileSync('public/store.css',fs.readFileSync('public/style.css','utf8')+'\n'+fs.readFileSync('public/design.css','utf8'));
 const value = process.env.SHOP_API_ORIGIN;
 if (!value) throw new Error('Netlify muhitida SHOP_API_ORIGIN ga Cloudflare Worker HTTPS manzilini kiriting.');
 const url = new URL(value);

@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS product_templates (product INTEGER PRIMARY KEY, revision INTEGER NOT NULL, settings TEXT NOT NULL);

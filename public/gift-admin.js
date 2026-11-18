@@ -1,5 +1,5 @@
 const giftStatusNames=['Qabul qilindi','Tayyorlanmoqda','Tayyor','Topshirildi'];
-const giftSettingNames={width:'Shokolad o‘rami eni (mm, 1–190)',height:'Shokolad o‘rami bo‘yi (mm, 1–277)',pickup:'Olib ketish manzili',delivery:'Yetkazish narxi (buyurtmaga, so‘m)',photo:'Qo‘shimcha foto (donasiga, so‘m)',card:'Tabrik kartasi (donasiga, so‘m)',bag:'Sovg‘a paketi (donasiga, so‘m)'};
+const giftSettingNames={pickup:'Olib ketish manzili',delivery:'Yetkazish narxi (buyurtmaga, so‘m)',photo:'Qo‘shimcha foto (donasiga, so‘m)',card:'Tabrik kartasi (donasiga, so‘m)',bag:'Sovg‘a paketi (donasiga, so‘m)'};
 async function loadGiftSettings(){
  const panel=document.getElementById('giftSettings');
  try{
@@ -14,7 +14,7 @@ async function loadGiftSettings(){
   const save=document.createElement('button'),message=document.createElement('p');message.setAttribute('role','status');
   save.textContent='Sozlamalarni saqlash';panel.append(save,message);
   save.onclick=async()=>{
-   const data={};for(const [key,field] of Object.entries(controls)){
+   const data={width:settings.width||0,height:settings.height||0};for(const [key,field] of Object.entries(controls)){
     if(!field.reportValidity())return;
     data[key]=key==='pickup'?field.value.trim():field.value===''?(['width','height'].includes(key)?0:null):Number(field.value);
    }
@@ -46,7 +46,7 @@ function adminGift(order,info){
  button.onclick=async()=>{
   button.disabled=true;
   try{const img=new Image();img.src='/api/admin/orders/'+order.id+'/photo';await img.decode();
-   const canvas=document.createElement('canvas');drawWrapper(canvas,img,g.design);downloadSheet(canvas,g.design,order.id);
+   const canvas=document.createElement('canvas');drawWrapper(canvas,img,g.design,await loadTemplateImage(g.design.template));downloadSheet(canvas,g.design,order.id);
   }catch{feedback.textContent=' Surat yuklanmadi. Qayta urinib ko‘ring.';}finally{button.disabled=false;}
  };
 }

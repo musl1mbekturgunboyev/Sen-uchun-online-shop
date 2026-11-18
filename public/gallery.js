@@ -3,7 +3,7 @@ let promotion=0, rotation, activeProduct, photoIndex=0;
 function priceText(p){return p.price===null?'Narx kelishiladi':p.price.toLocaleString()+' so‘m';}
 function showPromotion(i){
  const product=services[i];if(!product)return;
- promotion=i;const photo=get('heroPhoto');photo.src=product.id===0&&product.image==='/media/chocolate.webp'?'/media/hero.webp':product.image;
+ promotion=i;const photo=get('heroPhoto');responsivePhoto(photo,product.id===0&&product.image==='/media/chocolate.webp'?'/media/hero.webp':product.image,'(max-width:620px) 50vw, 730px');
  get('heroName').textContent=product.name;get('heroDesc').textContent=product.desc;
  get('heroOrder').onclick=()=>openProduct(product);
  for(const el of [photo,banner.querySelector('.copy')])if(!matchMedia('(prefers-reduced-motion: reduce)').matches)el.animate([{opacity:.3,transform:'translateX(9px)'},{opacity:1,transform:'translateX(0)'}],{duration:480});
@@ -52,7 +52,7 @@ function showPhoto(index){
 }
 function openProduct(p){
  activeProduct=p;get('dName').textContent=p.name;get('dText').textContent=p.desc;get('dPrice').textContent=priceText(p);get('thumbs').replaceChildren();
- if(p.images.length>1)p.images.forEach((src,i)=>{const b=document.createElement('button'),img=new Image();img.src=src;img.alt=(i+1)+'-rasm';b.append(img);b.onclick=()=>showPhoto(i);get('thumbs').append(b)});
+ if(p.images.length>1)p.images.forEach((src,i)=>{const b=document.createElement('button'),img=new Image();img.src=src;img.width=50;img.height=50;img.loading='lazy';img.alt=(i+1)+'-rasm';b.append(img);b.onclick=()=>showPhoto(i);get('thumbs').append(b)});
  showPhoto(0);get('detail').showModal();get('detail').scrollTop=0;
 }
 get('enlarge').onclick=()=>get('zoom').showModal();get('dBuy').onclick=()=>{get('detail').close();showOrder(activeProduct.id)};

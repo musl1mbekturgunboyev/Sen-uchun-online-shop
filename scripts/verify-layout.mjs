@@ -1,0 +1,17 @@
+import vm from 'node:vm';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const calls=[];
+const c={fillRect(...a){calls.push(['fill',...a]);},drawImage(...a){calls.push(['image',...a]);},save(){},restore(){},beginPath(){},rect(...a){calls.push(['clipRect',...a]);},clip(){},measureText(text){return {width:text.length*20};},fillText(...a){calls.push(['text',...a]);}};
+const canvas={getContext(){return c;}},photo={naturalWidth:1000,naturalHeight:500},background={naturalWidth:500,naturalHeight:800};
+const context=vm.createContext({console});vm.runInContext(fs.readFileSync('public/gift-layout.js','utf8'),context);
+const design={width:120,height:180,x:50,y:50,zoom:100,text:'Gulsevar',template:{photo:{x:10,y:20,w:40,h:30},label:{x:20,y:70,w:60,h:20,color:'#ffffff',size:8}}};
+context.drawWrapper(canvas,photo,design,background);
+assert.equal(canvas.width,1440);assert.equal(canvas.height,2160);
+assert.equal(calls.find(x=>x[0]==='image')[1],background,'Product background must be drawn first');
+assert.deepEqual(calls.filter(x=>x[0]==='clipRect'),[['clipRect',144,432,576,648],['clipRect',288,1512,864,432]]);
+assert.deepEqual(calls.find(x=>x[0]==='text'),['text','Gulsevar',720,1728]);
+assert.throws(()=>context.drawWrapper(canvas,photo,design,null));
+calls.length=0;context.drawWrapper(canvas,photo,{width:150,height:100,x:50,y:50,zoom:100,text:'Legacy'});
+assert.equal(calls.find(x=>x[0]==='text')[1],'Legacy');
+console.log('PASS product background, photo clipping, name region, dimensions and legacy layout');

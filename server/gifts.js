@@ -1,12 +1,17 @@
 const stages=['Qabul qilindi','Tayyorlanmoqda','Tayyor','Topshirildi'];
 const giftDefaults={width:0,height:0,pickup:'',delivery:null,photo:null,card:null,bag:null};
 const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
-async function giftSettings(env){
+async function giftSettings(env,id){
  const row=await env.DB.prepare('SELECT settings FROM gift_settings WHERE id=1').first();
- return row?JSON.parse(row.settings):giftDefaults;
+ const settings=row?JSON.parse(row.settings):giftDefaults;
+ return id===undefined?settings:{...settings,template:await productTemplate(env,id)};
 }
 async function giftRoute(request,env,path){
- if(path==='/api/gifts'&&request.method==='GET')return json(await giftSettings(env));
+ if(path==='/api/gifts'&&request.method==='GET'){
+  const id=new URL(request.url).searchParams.get('product');
+  if(id!==null&&!/^\d{1,9}$/.test(id))return json({},400);
+  return json(await giftSettings(env,id===null?undefined:Number(id)));
+ }
  if(path==='/api/track'&&request.method==='GET'){
   const token=request.headers.get('X-Tracking-Key')||'';
   if(!/^[a-f0-9-]{36}$/.test(token))return json({},404);
@@ -28,7 +33,7 @@ async function giftRoute(request,env,path){
  return json({saved:true});
 }
 async function calculateGift(raw,env,product,id,qty,hasPhoto){
- const settings=await giftSettings(env);
+ const settings=await giftSettings(env,id);
  const g=JSON.parse(raw);
  if(!g||!Array.isArray(g.extras)||g.extras.length>3||new Set(g.extras).size!==g.extras.length)throw Error();
  let amount=0;
@@ -42,11 +47,12 @@ async function calculateGift(raw,env,product,id,qty,hasPhoto){
  const total=product.price==null?null:(product.price+amount)*qty+fee;
  if(total!==g.total||g.signature!==JSON.stringify(settings))throw Error();
  let design=null;
+ const t=settings.template;
  if(g.design){
   const d=g.design;
-  if(id!==0||!hasPhoto||!settings.width||!settings.height||typeof d.text!=='string'||d.text.length>80||!integer(d.x,0,100)||!integer(d.y,0,100)||!integer(d.zoom,100,300))throw Error();
-  design={text:d.text,x:d.x,y:d.y,zoom:d.zoom,width:settings.width,height:settings.height};
+  if(!t?.enabled||!hasPhoto||d.templateRevision!==t.revision||typeof d.text!=='string'||d.text.length>80||!integer(d.x,0,100)||!integer(d.y,0,100)||!integer(d.zoom,100,300))throw Error();
+  design={text:d.text,x:d.x,y:d.y,zoom:d.zoom,width:t.width,height:t.height,template:t};
  }
- if(id===0&&settings.width&&hasPhoto&&!design)throw Error();
+ if(t?.enabled&&hasPhoto&&!design)throw Error();
  return {method:g.method,address:g.method==='pickup'?settings.pickup:g.address,time:g.time,extras,fee,total,unit:product.price,design};
 }

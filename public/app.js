@@ -35,12 +35,12 @@ function render(){
  document.querySelectorAll('[data-group]').forEach(b=>b.setAttribute('aria-pressed',String(!['fav','bag'].includes(mode)&&b.dataset.group===group)));
  document.querySelector('.count').textContent=bag.size;
  get('listTitle').textContent=mode==='fav'?'Saralangan':mode==='bag'?'Savat':q?'Qidiruv natijalari':group||'Sovg‘alar katalogi';
- get('cards').replaceChildren();
+ get('cards').replaceChildren();get('cards').setAttribute('aria-busy','false');
  services.forEach(s=>{const id=s.id;
  if((mode==='fav'&&!fav.has(id))||(mode==='bag'&&!bag.has(id))||(group&&s.group!==group)||!(s.name+' '+s.desc+' '+s.group).toLowerCase().includes(q))return;
  const card=document.createElement('article');
  card.innerHTML='<button class="product"><img></button><button class="love">'+icon('heart')+'</button><h3><button></button></h3><p></p><div class="base"><strong></strong><button class="add">'+icon(bag.has(id)?'check':'bag')+'</button></div>';
- card.querySelector('img').src=s.image;card.querySelector('img').alt=s.name;
+ const photo=card.querySelector('img');photo.width=480;photo.height=480;photo.loading='lazy';photo.decoding='async';responsivePhoto(photo,s.image,'(max-width:620px) 46vw, (max-width:930px) 30vw, 290px');card.querySelector('img').alt=s.name;
  card.querySelector('h3 button').textContent=s.name;card.querySelector('p').textContent=s.desc;card.querySelector('strong').textContent=s.price===null?'Narx kelishiladi':s.price.toLocaleString()+' so‘m';
  for(const [selector,label,pressed] of [['.product','Batafsil',null],['.love','Saralangan',fav.has(id)],['.add','Savat',bag.has(id)]]){
  const btn=card.querySelector(selector);btn.setAttribute('aria-label',s.name+' · '+label);if(pressed!==null)btn.setAttribute('aria-pressed',String(pressed));}
@@ -60,18 +60,18 @@ get('heroOrder').onclick=()=>select('all');
 async function init(){
  const r=await fetch('/api/catalog');if(!r.ok)throw Error();
  const data=await r.json();services=data.products.map(p=>({...p,group:p.category,desc:p.description}));
- const session=await fetch('/api/session').then(r=>r.json()).catch(()=>({}));
- if(session.owner){const a=document.createElement('a');a.href='/admin';a.textContent='Boshqaruv';document.querySelector('footer').append(a);}
+ fetch('/api/session').then(r=>r.json()).then(session=>{if(session.owner){const a=document.createElement('a');a.href='/admin';a.textContent='Boshqaruv';document.querySelector('footer').append(a);}}).catch(()=>{});
  const valid=new Set(services.map(p=>p.id));for(const list of [fav,bag])for(const id of list)if(!valid.has(id))list.delete(id);
  categories();render();setupBanner();track('view',-1);
 }
-window.addEventListener('DOMContentLoaded',()=>init().catch(()=>{get('empty').hidden=false;get('empty').textContent='Katalogni yuklab bo‘lmadi. Sahifani yangilang.';}));
+window.addEventListener('DOMContentLoaded',()=>init().catch(()=>{get('cards').replaceChildren();get('cards').setAttribute('aria-busy','false');get('empty').hidden=false;get('empty').textContent='Katalogni yuklab bo‘lmadi. Sahifani yangilang.';}));
 function clearPreview() {
   if (previewURL) URL.revokeObjectURL(previewURL);
   get('preview').hidden = true;
   get('preview').removeAttribute('src');
 }
 get('file').onchange = () => {
+  get('approved').checked=false;
   clearPreview();
   const file = get('file').files[0];
   if (file) {

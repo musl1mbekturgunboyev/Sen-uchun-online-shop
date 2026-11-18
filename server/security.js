@@ -39,6 +39,7 @@ async function limitedBody(request, cap) {
 function secure(response) {
   const res=new Response(response.body,response);
   res.headers.set('X-Content-Type-Options','nosniff');
+  res.headers.set('Cross-Origin-Opener-Policy','same-origin');
   res.headers.set('Referrer-Policy','same-origin');
   res.headers.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
   res.headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self' "+adminScriptHash+"; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'");

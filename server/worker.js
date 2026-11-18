@@ -33,6 +33,7 @@ async function dispatch(request,env){
  const origin=request.headers.get('Origin');
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
+ if(p==='/api/admin/template')return templateRoute(request,env);
  if(['/api/gifts','/api/track','/api/admin/gifts','/api/admin/stage'].includes(p))return giftRoute(request,env,p);
  if(p==='/api/my-orders'&&method==='GET')return customerOrders(request,env);
  if(p==='/api/orders'&&method==='POST')return acceptOrder(request,env);
@@ -59,7 +60,7 @@ async function dispatch(request,env){
  }
  if(/^\/catalog-media\/[a-f0-9]{64}$/.test(p)&&method==='GET'){
   const obj=await env.BUCKET.get(p.slice(1));if(!obj)return new Response(null,{status:404});
-  return new Response(obj.body,{headers:{'Content-Type':obj.httpMetadata.contentType,'Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});
+  return new Response(obj.body,{headers:{'Content-Type':obj.httpMetadata.contentType,'Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff'}});
  }
  if(p==='/api/event'&&method==='POST'){
   if(!owner&&!await allowRequest(request,env,'events',240))return json({},429);

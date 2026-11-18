@@ -1,9 +1,10 @@
 import fs from 'node:fs';
+fs.writeFileSync('public/store.css',fs.readFileSync('public/style.css','utf8')+'\n'+fs.readFileSync('public/design.css','utf8'));
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
 const standalone = process.argv.includes('--cloudflare');
-const mime = {html:'text/html; charset=utf-8', js:'text/javascript; charset=utf-8', css:'text/css; charset=utf-8', webp:'image/webp', jpg:'image/jpeg'};
+const mime = {html:'text/html; charset=utf-8', js:'text/javascript; charset=utf-8', css:'text/css; charset=utf-8', webp:'image/webp', jpg:'image/jpeg', png:'image/png', svg:'image/svg+xml', txt:'text/plain; charset=utf-8', xml:'application/xml'};
 const assets = {};
 for(const file of fs.readdirSync('public',{recursive:true})){
   const filename=path.join('public',file);
@@ -15,7 +16,7 @@ for(const file of fs.readdirSync('public',{recursive:true})){
 const admin=fs.readFileSync('server/admin.html','utf8');
 const script=admin.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
 const adminScriptHash="'sha256-"+createHash('sha256').update(script).digest('base64')+"'";
-const source=['security','gifts','orders','worker'].map(name=>fs.readFileSync('server/'+name+'.js','utf8'));
+const source=['security','templates','gifts','orders','worker'].map(name=>fs.readFileSync('server/'+name+'.js','utf8'));
 const directory=standalone?'dist/cloudflare':'dist/server';
 fs.mkdirSync(directory,{recursive:true});
 fs.writeFileSync(directory+'/index.js',[
