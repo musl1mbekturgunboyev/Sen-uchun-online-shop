@@ -42,14 +42,14 @@ function render(){
  const card=document.createElement('article');
  card.innerHTML='<button class="product"><img></button><button class="love">'+icon('heart')+'</button><h3><button></button></h3><p></p><div class="base"><strong></strong><button class="add">'+icon(bag.has(id)?'check':'bag')+'</button></div>';
  const photo=card.querySelector('img');photo.width=480;photo.height=480;photo.loading='lazy';photo.decoding='async';responsivePhoto(photo,s.image,'(max-width:620px) 46vw, (max-width:930px) 30vw, 290px');card.querySelector('img').alt=s.name;
- card.querySelector('h3 button').textContent=s.name;card.querySelector('p').textContent=s.desc;card.querySelector('strong').textContent=s.price===null?'Narx kelishiladi':s.price.toLocaleString()+' so‘m';
+ card.querySelector('h3 button').textContent=s.name;card.querySelector('p').textContent='Batafsil →';card.querySelector('p').className='card-details';card.querySelector('strong').textContent=s.price===null?'Narx kelishiladi':s.price.toLocaleString()+' so‘m';
  for(const [selector,label,pressed] of [['.product','Batafsil',null],['.love','Saralangan',fav.has(id)],['.add','Savat',bag.has(id)]]){
  const btn=card.querySelector(selector);btn.setAttribute('aria-label',s.name+' · '+label);if(pressed!==null)btn.setAttribute('aria-pressed',String(pressed));}
  card.querySelector('.product').onclick=card.querySelector('h3 button').onclick=card.querySelector('p').onclick=card.querySelector('strong').onclick=()=>openProduct(s);
  card.querySelector('.love').onclick=()=>{toggle(fav,'fav',id);render();notify(fav.has(id)?'Saralanganlarga qo‘shildi':'Saralanganlardan olindi');};
  card.querySelector('.add').onclick=()=>{toggle(bag,'bag',id);render();notify(bag.has(id)?'Savatga qo‘shildi':'Savatdan olindi');};
  if(mode==='bag'){const b=document.createElement('button');b.className='primary';b.textContent='Buyurtma berish';b.onclick=()=>showOrder(id);card.append(b);}
- if(s.lead_time){const label=document.createElement('small');label.className='lead-time';label.textContent='◷ '+s.lead_time;card.append(label);}
+ {const label=document.createElement('small');label.className='lead-time';label.textContent=s.lead_time?'◷ '+s.lead_time:'';card.append(label);}
  get('cards').append(card);
  });
  const n=get('cards').children.length;get('total').textContent=n+' ta xizmat';get('empty').hidden=!!n;

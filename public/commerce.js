@@ -33,13 +33,17 @@ async function loadProductExtras(product){
   if(reviews.count){const details=document.createElement('details');details.append(textNode('summary','Mijozlar fikrlari · '+Number(reviews.average).toFixed(1)+' / 5 ('+reviews.count+')'));const list=textNode('div','', 'review-grid');list.append(...reviews.reviews.map(reviewCard));details.append(list);container.append(details);}
  }catch{if(version===productExtrasVersion)container.replaceChildren(textNode('p','Shartlarni yuklab bo‘lmadi. Ulanishni tekshirib mahsulotni qayta oching.'));}
 }
+function paymentButton(container,token){
+ const box=textNode('div','', 'payment-panel'),button=textNode('button','To‘lov qilish → Admin bilan bog‘lanish','primary'),status=textNode('p','Buyurtma ma’lumotlari va yuklangan surat bot orqali adminga yuboriladi. Telegramda tayyor matnni yuboring.');button.type='button';status.setAttribute('role','status');box.append(button,status);container.append(box);
+ button.onclick=async()=>{button.disabled=true;try{const r=await fetch('/api/telegram/payment',{method:'POST',headers:{'X-Tracking-Key':token}}),data=await r.json();if(!r.ok)throw Error('Ulanmadi. Qayta urinib ko‘ring.');const link=textNode('a','Admin chatini ochish','primary');link.href=data.url;status.replaceChildren(textNode('span',data.queued?'Buyurtma adminga yuborish navbatiga qo‘yildi. ':'Bot sozlanmagan: surat avtomatik yuborilmadi. '),link);location.assign(data.url);}catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
+}
 function notificationButtons(container,token){
+ paymentButton(container,token);
  const button=textNode('button','Telegramda xabar olish','secondary'),status=textNode('p','');button.type='button';status.setAttribute('role','status');container.append(button,status);
  button.onclick=async()=>{
   button.disabled=true;
   try{const r=await fetch('/api/telegram/link',{method:'POST',headers:{'X-Tracking-Key':token}}),data=await r.json();if(!r.ok)throw Error(data.error||'Ulanmadi. Qayta urinib ko‘ring.');
-   status.replaceChildren();if(data.subscribed)status.textContent='Telegram xabarlari ulangan.';
-   else{const link=textNode('a','Telegramni ochish → Start','primary');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';status.append(link,textNode('small',' Havola 15 daqiqa amal qiladi. Xabarlar kelishi uchun botda Start bosing.'));}
+   status.replaceChildren();{const link=textNode('a','Telegramni ochish → Start','primary');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';status.append(link,textNode('small',' Holatni ko‘rish uchun botda Start bosing.'));location.assign(data.url);}
   }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
  };
  const stop=textNode('button','Telegram xabarlarini o‘chirish','quiet');stop.type='button';container.append(stop);

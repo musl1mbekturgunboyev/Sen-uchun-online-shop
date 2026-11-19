@@ -1,4 +1,4 @@
-const giftStatusNames=['Qabul qilindi','Tayyorlanmoqda','Tayyor','Topshirildi'];
+const giftStatusNames=['Yangi','Qabul qilindi','Tayyorlanmoqda','Tayyor','Yo‘lda','Topshirildi'];
 const giftSettingNames={pickup:'Olib ketish manzili',delivery:'Yetkazish narxi (buyurtmaga, so‘m)',photo:'Qo‘shimcha foto (donasiga, so‘m)',card:'Tabrik kartasi (donasiga, so‘m)',bag:'Sovg‘a paketi (donasiga, so‘m)',deliveryAreas:'Yetkazish hududlari',deliveryTime:'Yetkazish muddati',deliveryTerms:'Yetkazish shartlari'};
 async function loadGiftSettings(){
  const panel=document.getElementById('giftSettings');
@@ -24,17 +24,17 @@ async function loadGiftSettings(){
   };
  }catch{panel.append('Sozlamalarni yuklab bo‘lmadi. Sahifani yangilang.');}
 }
-function adminGift(order,info){
+function adminGift(order,info,details=info){
  const status=document.createElement('select');status.setAttribute('aria-label','Buyurtma holati');
  if(!order.stage)status.add(new Option('Avvalgi buyurtma',''));
  giftStatusNames.forEach(stage=>status.add(new Option(stage,stage)));status.value=order.stage||'';
  const feedback=document.createElement('small');info.append(status,feedback);
  status.onchange=async()=>{
   status.disabled=true;
-  try{const r=await fetch('/api/admin/stage',{method:'POST',body:JSON.stringify({id:order.id,previous:order.stage,stage:status.value})});if(!r.ok)throw Error();order.stage=status.value;feedback.textContent=' Saqlandi.';}
+  try{const r=await fetch('/api/admin/stage',{method:'POST',body:JSON.stringify({id:order.id,previous:order.stage,stage:status.value})});if(!r.ok)throw Error();order.stage=status.value;feedback.textContent=' Saqlandi.';document.dispatchEvent(new Event('order-stage-saved'));}
   catch{status.value=order.stage||'';feedback.textContent=' Yangilab qayta urining.';}finally{status.disabled=false;}
  };
- addFinanceEditor(order,info);
+ info=details;addFinanceEditor(order,info);
  if(!order.gift)return;
  const g=JSON.parse(order.gift);
  const line=text=>{const p=document.createElement('p');p.textContent=text;info.append(p);};

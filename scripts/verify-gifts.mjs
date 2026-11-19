@@ -50,7 +50,7 @@ form.set('gift',JSON.stringify({...choice,total:null,signature:JSON.stringify(ot
 const boxReceipt=await (await call('/api/orders','POST',form)).json();assert.ok(boxReceipt.tracking);
 const boxOrders=await (await call('/api/admin/orders','GET',undefined,admin)).json();
 assert.equal(JSON.parse(boxOrders.find(o=>o.id===boxReceipt.id).gift).design.width,120);
-const update=JSON.stringify({id,previous:'Qabul qilindi',stage:'Tayyor'});
+const update=JSON.stringify({id,previous:'Yangi',stage:'Tayyor'});
 assert.equal((await call('/api/admin/stage','POST',update,admin)).status,200);
 assert.equal((await call('/api/admin/stage','POST',update,admin)).status,409);
 assert.deepEqual(await (await call('/api/track','GET',undefined,{'X-Tracking-Key':receipt.tracking})).json(),{product:'Shokolad',qty:2,stage:'Tayyor'});

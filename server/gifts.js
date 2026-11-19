@@ -1,4 +1,4 @@
-const stages=['Qabul qilindi','Tayyorlanmoqda','Tayyor','Topshirildi'];
+const stages=['Yangi','Qabul qilindi','Tayyorlanmoqda','Tayyor','Yo‘lda','Topshirildi'];
 const giftDefaults={width:0,height:0,pickup:'',delivery:null,photo:null,card:null,bag:null,deliveryAreas:'',deliveryTime:'',deliveryTerms:''};
 const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
 async function giftSettings(env,id){

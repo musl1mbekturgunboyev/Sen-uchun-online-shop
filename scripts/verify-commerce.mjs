@@ -22,7 +22,7 @@ const stored=await DB.prepare('SELECT * FROM orders WHERE id=?').bind(orderId).f
 const tracking={'X-Tracking-Key':receipt.tracking};
 const review={name:'Sinov mijoz',rating:5,text:'Sovg‘a yoqdi!',consent:true,photo:'data:image/jpeg;base64,'+fs.readFileSync('public/media/photo.jpg').toString('base64')};
 assert.equal((await call('/api/reviews/submit','POST',review,tracking)).status,403);
-await call('/api/admin/stage','POST',{id:orderId,previous:'Qabul qilindi',stage:'Topshirildi'},auth);
+await call('/api/admin/stage','POST',{id:orderId,previous:'Yangi',stage:'Topshirildi'},auth);
 assert.equal((await call('/api/reviews/submit','POST',{...review,consent:false},tracking)).status,400);
 assert.equal((await call('/api/reviews/submit','POST',review,tracking)).status,200);
 assert.equal((await call('/api/reviews/submit','POST',review,tracking)).status,409);
@@ -40,6 +40,18 @@ assert.equal((await call('/api/admin/finance','POST',finance,auth)).status,409);
 assert.equal((await call('/api/admin/finance','POST',{...finance,revision:1,cost:-1},auth)).status,400);
 const report=await call('/api/admin/export?from=2020-01-01&to=2030-12-31','GET',undefined,auth);assert.equal(report.status,200);fs.writeFileSync('dist/sen-uchun-report-test.xlsx',Buffer.from(await report.arrayBuffer()));
 assert.equal((await call('/api/admin/export?from=2026-02-31&to=2030-01-01','GET',undefined,auth)).status,400);
+
+// Payment requests require the private order capability, use server prices, and deduplicate.
+assert.equal((await call('/api/telegram/payment','POST',{})).status,404);
+const payment=await (await call('/api/telegram/payment','POST',{total:1},tracking)).json();
+assert.equal(payment.queued,true);assert.ok(new URL(payment.url).searchParams.get('text').includes('50000 so‘m'));
+assert.ok(!payment.url.includes(receipt.tracking));
+await call('/api/telegram/payment','POST',{},tracking);
+assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE id=?").bind('payment:'+orderId).first()).n,1);
+assert.equal((await call('/api/telegram/payment','POST',{},tracking,{...env,TELEGRAM_BOT_TOKEN:''})).status,200);
+assert.equal((await call('/api/admin/orders?stage=invalid','GET',undefined,auth)).status,400);
+const delivered=await (await call('/api/admin/orders?stage=Topshirildi','GET',undefined,auth)).json();assert.ok(delivered.some(o=>o.id===orderId));
+const fresh=await (await call('/api/admin/orders?stage=Yangi','GET',undefined,auth)).json();assert.ok(!fresh.some(o=>o.id===orderId));
 // Mock Telegram; no real messages are sent by these tests.
 const realFetch=globalThis.fetch,sent=[];let fail=false;
 globalThis.fetch=async(url,options)=>{sent.push({url,body:options.body});if(fail)return Response.json({ok:false,error_code:429,parameters:{retry_after:60}},{status:429});return Response.json({ok:true,result:String(url).endsWith('/getMe')?{username:'SenUchunTestBot'}:true});};
@@ -52,6 +64,7 @@ try{
  const hook={'X-Telegram-Bot-Api-Secret-Token':env.TELEGRAM_WEBHOOK_SECRET,Origin:'https://telegram.test'};
  assert.equal((await call('/api/telegram/webhook','POST',update,hook)).status,200);
  assert.equal((await DB.prepare('SELECT telegram_chat FROM orders WHERE id=?').bind(orderId).first()).telegram_chat,'456');
+ const repeatLink=await (await call('/api/telegram/link','POST',{},tracking)).json();assert.ok(repeatLink.url?.includes('?start='));
  const pendingBefore=(await DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()).n;
  await call('/api/telegram/webhook','POST',update,hook);assert.equal((await DB.prepare('SELECT COUNT(*) AS n FROM notifications').first()).n,pendingBefore);
  await call('/api/admin/stage','POST',{id:orderId,previous:'Topshirildi',stage:'Tayyor'},auth);

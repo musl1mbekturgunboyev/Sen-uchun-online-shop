@@ -49,12 +49,21 @@ async function notificationRoute(request,env,path){
  if(path==='/api/admin/telegram/retry'&&request.method==='POST'){
   await env.DB.prepare('UPDATE notifications SET attempts=0,next_attempt=0 WHERE sent_at IS NULL AND lease_until<?').bind(Date.now()).run();await flushNotifications(env);return json({saved:true});
  }
+ if(path==='/api/telegram/payment'&&request.method==='POST'){
+  if(!await allowRequest(request,env,'payment',20))return json({},429);
+  const o=await trackedOrder(request,env);if(!o)return json({},404);
+  const finance=await env.DB.prepare('SELECT agreed_total,received FROM order_finance WHERE order_id=?').bind(o.id).first();
+  const gift=o.gift?JSON.parse(o.gift):null,total=finance?.agreed_total??gift?.total??null;
+  const text='Assalomu alaykum! Buyurtma uchun to‘lov qilmoqchiman.\nBuyurtma № '+o.id.slice(0,8)+'\n'+o.product+' — '+o.qty+' dona\nJami: '+(total===null?'Kelishiladi':total+' so‘m')+'\nHolat: '+o.stage+'\n'+(o.note||'');
+  const queued=!!(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_ADMIN_CHAT_ID);
+  if(queued)await env.DB.prepare('INSERT OR IGNORE INTO notifications(id,order_id,kind,chat_id,text) VALUES(?,?,?,?,?)').bind('payment:'+o.id,o.id,'new',String(env.TELEGRAM_ADMIN_CHAT_ID),text+'\nMijoz aloqasi: '+(o.contact||'Ko‘rsatilmagan')+'\nBu to‘lov so‘rovi, to‘langanlik tasdig‘i emas.').run();
+  return json({url:'https://t.me/Life_Uz1?text='+encodeURIComponent(text),queued});
+ }
  if(path==='/api/telegram/link'&&request.method==='POST'){
   if(!await allowRequest(request,env,'telegram-link',20))return json({},429);
   const o=await trackedOrder(request,env);if(!o)return json({},404);
   const integration=await env.DB.prepare('SELECT bot_username FROM integrations WHERE id=1').first();
   if(!integration||!env.TELEGRAM_BOT_TOKEN)return json({error:'Telegram bildirishnomalari hali ulanmagan. Holatni shu sahifada ko‘rishingiz mumkin.'},503);
-  if(o.telegram_chat)return json({subscribed:true});
   const bytes=crypto.getRandomValues(new Uint8Array(24)),token=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   await env.DB.batch([env.DB.prepare('DELETE FROM telegram_links WHERE order_id=?').bind(o.id),env.DB.prepare('INSERT INTO telegram_links VALUES(?,?,?)').bind(await digest(token),o.id,Date.now()+900000)]);
   return json({url:'https://t.me/'+integration.bot_username+'?start='+token});
@@ -83,7 +92,7 @@ async function telegramWebhook(request,env){
   if(link){
    await env.DB.prepare('UPDATE orders SET telegram_chat=? WHERE id=? AND (telegram_chat IS NULL OR telegram_chat=?)').bind(chat,link.order_id,chat).run();
    const o=await env.DB.prepare('SELECT product,stage,telegram_chat FROM orders WHERE id=?').bind(link.order_id).first();
-   answer=o?.telegram_chat===chat?'Sen uchun · '+o.product+'\nHozirgi holat: '+o.stage+'\nHolat o‘zgarsa xabar yuboramiz. To‘xtatish: /stop':'Obuna boshqa hisobga ulangan. Saytdagi kuzatuv sahifasidan bekor qilib qayta ulang.';
+   answer=o?.telegram_chat===chat?'Sen uchun · № '+link.order_id.slice(0,8)+'\n'+o.product+'\nHozirgi holat: '+o.stage+'\nHolat o‘zgarsa xabar yuboramiz. To‘xtatish: /stop':'Obuna boshqa hisobga ulangan. Saytdagi kuzatuv sahifasidan bekor qilib qayta ulang.';
   }else answer='Havola ishlatilgan yoki muddati tugagan. Saytdan yangi havola oling.';
  }else if(!match)return json({ok:true});
  if(!Number.isSafeInteger(data.update_id))return json({},400);

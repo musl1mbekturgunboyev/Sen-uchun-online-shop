@@ -15,7 +15,9 @@ async function customerOrders(request, env) {
  if(!hash)return json({},401);
  const before=new URL(request.url).searchParams.get('before')||'9223372036854775807';
  if(!/^\d{1,19}$/.test(before))return json({},400);
- const rows=await env.DB.prepare('SELECT rowid AS cursor,id,created,product,qty,stage,tracking FROM orders WHERE customer_hash=? AND rowid<CAST(? AS INTEGER) ORDER BY rowid DESC LIMIT 41').bind(hash,before).all();
+ const stage=new URL(request.url).searchParams.get('stage')||'';
+ if(stage&&!stages.includes(stage))return json({},400);
+ const rows=await env.DB.prepare("SELECT rowid AS cursor,id,created,product,qty,stage,tracking FROM orders WHERE customer_hash=? AND rowid<CAST(? AS INTEGER) AND (?='' OR stage=?) ORDER BY rowid DESC LIMIT 41").bind(hash,before,stage,stage).all();
  return json({orders:rows.results.slice(0,40), more:rows.results.length>40});
 }
 async function acceptOrder(request,env){

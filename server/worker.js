@@ -36,14 +36,15 @@ async function dispatch(request,env){
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
  if(['/api/admin/product-details','/api/reviews','/api/reviews/submit','/api/admin/reviews','/api/admin/review','/api/admin/finance','/api/admin/export'].includes(p)||p.startsWith('/review-photo/'))return commerceRoute(request,env,p);
- if(['/api/telegram/link','/api/telegram/unlink','/api/admin/telegram','/api/admin/telegram/setup','/api/admin/telegram/retry'].includes(p))return notificationRoute(request,env,p);
+ if(['/api/telegram/payment','/api/telegram/link','/api/telegram/unlink','/api/admin/telegram','/api/admin/telegram/setup','/api/admin/telegram/retry'].includes(p))return notificationRoute(request,env,p);
  if(p==='/api/admin/template')return templateRoute(request,env);
  if(['/api/gifts','/api/track','/api/admin/gifts','/api/admin/stage'].includes(p))return giftRoute(request,env,p);
  if(p==='/api/my-orders'&&method==='GET')return customerOrders(request,env);
  if(p==='/api/orders'&&method==='POST')return acceptOrder(request,env);
  if(p==='/api/admin/orders'&&method==='GET'){
   const before=url.searchParams.get('before')||'9999999999999';
-  const rows=await env.DB.prepare('SELECT rowid AS cursor,* FROM orders WHERE rowid<? ORDER BY rowid DESC LIMIT 40').bind(Number(before)).all();return json(rows.results);
+  const stage=url.searchParams.get('stage')||'';if(stage&&!stages.includes(stage))return json({},400);
+  const rows=await env.DB.prepare("SELECT rowid AS cursor,* FROM orders WHERE rowid<? AND (?='' OR stage=?) ORDER BY rowid DESC LIMIT 40").bind(Number(before),stage,stage).all();return json(rows.results);
  }
  if(/^\/api\/admin\/orders\/[a-f0-9-]{36}\/photo$/.test(p)&&method==='GET')return orderPhoto(env,p.split('/')[4],url.searchParams.has('download'));
  if(p==='/admin'&&method==='GET')return new Response(adminPage,{headers:{...noCache,'Content-Type':'text/html; charset=utf-8','Referrer-Policy':'no-referrer'}});
