@@ -42,7 +42,7 @@ function render(){
  const card=document.createElement('article');
  card.innerHTML='<button class="product"><img></button><button class="love">'+icon('heart')+'</button><h3><button></button></h3><p></p><div class="base"><strong></strong><button class="add">'+icon(bag.has(id)?'check':'bag')+'</button></div>';
  const photo=card.querySelector('img');photo.width=480;photo.height=480;photo.loading='lazy';photo.decoding='async';responsivePhoto(photo,s.image,'(max-width:620px) 46vw, (max-width:930px) 30vw, 290px');card.querySelector('img').alt=s.name;
- card.querySelector('h3 button').textContent=s.name;card.querySelector('p').textContent='Batafsil →';card.querySelector('p').className='card-details';card.querySelector('strong').textContent=s.price===null?'Narx kelishiladi':s.price.toLocaleString()+' so‘m';
+ card.querySelector('h3 button').textContent=s.name;card.querySelector('p').textContent='Batafsil →';card.querySelector('p').className='card-details';renderPrice(card.querySelector('strong'),s);if(s.original_price!=null){const badge=document.createElement('span');badge.className='discount-badge';badge.textContent=s.discount_percent?'−'+s.discount_percent+'%':'Chegirma';card.append(badge);}
  for(const [selector,label,pressed] of [['.product','Batafsil',null],['.love','Saralangan',fav.has(id)],['.add','Savat',bag.has(id)]]){
  const btn=card.querySelector(selector);btn.setAttribute('aria-label',s.name+' · '+label);if(pressed!==null)btn.setAttribute('aria-pressed',String(pressed));}
  card.querySelector('.product').onclick=card.querySelector('h3 button').onclick=card.querySelector('p').onclick=card.querySelector('strong').onclick=()=>openProduct(s);
@@ -99,14 +99,14 @@ get('form').onsubmit=async e=>{
   const link=new URL('/api/admin/orders/'+saved.id+'/photo',location.origin).href;
   message=['Assalomu alaykum! Sen uchun buyurtmam #'+saved.id.slice(0,8),service+' — '+qty+' dona.',note&&'Matn: '+note,file&&'Asl surat: '+link].filter(Boolean).join('\n');
   get('details').textContent=service+' — '+qty+' dona. Buyurtma № '+saved.id.slice(0,8);
-  get('details').textContent+=' Keyin «Buyurtmalarim» bo‘limida ko‘rishingiz mumkin.';
+  get('details').textContent+=' · Yangi';
   showReceiptActions(saved.tracking);
   get('trackReceipt').hidden=!saved.tracking;if(saved.tracking)get('trackReceipt').href=trackingLink(saved.tracking);
   get('send').href='https://t.me/Life_Uz1?text='+encodeURIComponent(message);
   get('hint').textContent=file?'Asl surat sotuvchining admin paneliga yetkazildi.':'Sotuvchi buyurtmani admin panelda ko‘radi.';
   const share=get('sharePhoto');share.hidden=!(file&&navigator.canShare?.({files:[file]}));
   share.onclick=async()=>{try{await navigator.share({files:[file],text:service+' — '+qty+' dona. '+note});}catch(err){if(err.name!=='AbortError')get('hint').textContent='Ulashish ochilmadi. Surat admin panelda saqlangan.';}};
-  get('copy').textContent='Buyurtma matnini nusxalash';get('ready').hidden=false;get('form').hidden=true;
+  get('copy').textContent='Buyurtma matnini nusxalash';get('ready').hidden=false;get('form').hidden=true;dialog.scrollTop=0;
  }catch(err){if(pendingId===orderId)get('orderError').textContent=err.message||'Qayta urinib ko‘ring.';}
  finally{button.disabled=false;button.textContent='Buyurtmani yuborish →';}
 };

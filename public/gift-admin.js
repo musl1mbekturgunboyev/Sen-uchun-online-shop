@@ -25,6 +25,7 @@ async function loadGiftSettings(){
  }catch{panel.append('Sozlamalarni yuklab bo‘lmadi. Sahifani yangilang.');}
 }
 function adminGift(order,info,details=info){
+ const total=order.agreed_total??(order.gift?JSON.parse(order.gift).total:null),received=order.received||0,payment=document.createElement('p');payment.className='payment-status';payment.textContent=(total!=null&&received>=total?'To‘langan':received>0?'Qisman to‘langan':'To‘lov kutilmoqda')+' · '+money(received);info.append(payment);
  const status=document.createElement('select');status.setAttribute('aria-label','Buyurtma holati');
  if(!order.stage)status.add(new Option('Avvalgi buyurtma',''));
  giftStatusNames.forEach(stage=>status.add(new Option(stage,stage)));status.value=order.stage||'';

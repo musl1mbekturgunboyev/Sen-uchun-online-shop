@@ -33,23 +33,19 @@ async function loadProductExtras(product){
   if(reviews.count){const details=document.createElement('details');details.append(textNode('summary','Mijozlar fikrlari · '+Number(reviews.average).toFixed(1)+' / 5 ('+reviews.count+')'));const list=textNode('div','', 'review-grid');list.append(...reviews.reviews.map(reviewCard));details.append(list);container.append(details);}
  }catch{if(version===productExtrasVersion)container.replaceChildren(textNode('p','Shartlarni yuklab bo‘lmadi. Ulanishni tekshirib mahsulotni qayta oching.'));}
 }
-function paymentButton(container,token){
- const box=textNode('div','', 'payment-panel'),button=textNode('button','To‘lov qilish → Admin bilan bog‘lanish','primary'),status=textNode('p','Buyurtma ma’lumotlari va yuklangan surat bot orqali adminga yuboriladi. Telegramda tayyor matnni yuboring.');button.type='button';status.setAttribute('role','status');box.append(button,status);container.append(box);
- button.onclick=async()=>{button.disabled=true;try{const r=await fetch('/api/telegram/payment',{method:'POST',headers:{'X-Tracking-Key':token}}),data=await r.json();if(!r.ok)throw Error('Ulanmadi. Qayta urinib ko‘ring.');const link=textNode('a','Admin chatini ochish','primary');link.href=data.url;status.replaceChildren(textNode('span',data.queued?'Buyurtma adminga yuborish navbatiga qo‘yildi. ':'Bot sozlanmagan: surat avtomatik yuborilmadi. '),link);location.assign(data.url);}catch(e){status.textContent=e.message;}finally{button.disabled=false;}};
-}
 function notificationButtons(container,token){
- paymentButton(container,token);
- const button=textNode('button','Telegramda xabar olish','secondary'),status=textNode('p','');button.type='button';status.setAttribute('role','status');container.append(button,status);
+ paymentPanel(container,token);
+ const button=textNode('button','Telegramda holatni ko‘rish','telegram-action'),status=textNode('p','');button.type='button';status.setAttribute('role','status');container.append(button,status);
  button.onclick=async()=>{
   button.disabled=true;
   try{const r=await fetch('/api/telegram/link',{method:'POST',headers:{'X-Tracking-Key':token}}),data=await r.json();if(!r.ok)throw Error(data.error||'Ulanmadi. Qayta urinib ko‘ring.');
    status.replaceChildren();{const link=textNode('a','Telegramni ochish → Start','primary');link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';status.append(link,textNode('small',' Holatni ko‘rish uchun botda Start bosing.'));location.assign(data.url);}
   }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
  };
- const stop=textNode('button','Telegram xabarlarini o‘chirish','quiet');stop.type='button';container.append(stop);
+ const stop=textNode('button','Telegram xabarlarini o‘chirish','quiet');stop.type='button';const settings=document.createElement('details');settings.className='notification-settings';settings.append(textNode('summary','Bildirishnoma sozlamalari'),stop);container.append(settings);
  stop.onclick=async()=>{stop.disabled=true;try{const r=await fetch('/api/telegram/unlink',{method:'POST',headers:{'X-Tracking-Key':token}});if(!r.ok)throw Error();status.textContent='Telegram bildirishnomalari o‘chirildi.';}catch{status.textContent='O‘chirilmadi. Qayta urinib ko‘ring.';}finally{stop.disabled=false;}};
 }
-function showReceiptActions(token){const box=get('receiptActions');box.replaceChildren();if(token)notificationButtons(box,token);}
+function showReceiptActions(token){const box=get('receiptActions');box.replaceChildren();if(token){notificationButtons(box,token);const track=textNode('a','Buyurtma holatini ko‘rish','secondary');track.href=trackingLink(token);track.onclick=()=>get('order').close();box.prepend(track);}}
 async function reviewPhoto(file){
  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>10485760)throw Error('10 MB gacha JPG, PNG yoki WebP tanlang.');
  const bitmap=await createImageBitmap(file);try{for(const edge of [1200,900,600]){const scale=Math.min(1,edge/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);const data=canvas.toDataURL('image/webp',.8);if(data.length<500000)return data;}throw Error('Rasm hajmini kichraytiring.');}finally{bitmap.close();}

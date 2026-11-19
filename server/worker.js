@@ -12,14 +12,14 @@ function isOwner(request){
 const samples=new Map([[0,['/media/hero.webp']],[1,['/media/box-detail.jpg']],[2,['/media/book-inside.jpg']]]);
 function decodeImages(value){return value.startsWith('[')?JSON.parse(value):[value];}
 async function catalog(db,editing=false){
- const rows=(await db.prepare('SELECT id,name,description,category,price,visible,revision,image FROM products ORDER BY id').all()).results;
+ const rows=(await db.prepare('SELECT id,name,description,category,price,sale_price,visible,revision,image FROM products ORDER BY id').all()).results;
  const merged=new Map(initial.map(p=>[p.id,{...p,images:[p.image,...(samples.get(p.id)||[])]}]));
  for(const row of rows){
   const images=decodeImages(row.image).map((src,index)=>!editing&&src.startsWith('data:')?'/product-image/'+row.id+'?i='+index+'&v='+row.revision:src);
   merged.set(row.id,{...row,image:images[0],images});
  }
  const details=(await db.prepare('SELECT * FROM product_details').all()).results;
- return [...merged.values()].map(p=>{const d=details.find(d=>d.product===p.id);return {...p,lead_time:d?.lead_time||'',bundle:d?.bundle||'',occasions:d?JSON.parse(d.occasions):[],detail_revision:d?.revision||0};});
+ return [...merged.values()].map(p=>{const d=details.find(d=>d.product===p.id);const sale=p.sale_price!=null&&p.price!=null&&p.sale_price<p.price;return {...p,original_price:sale?p.price:null,price:!editing&&sale?p.sale_price:p.price,discount_percent:sale?Math.round((p.price-p.sale_price)/p.price*100):0,lead_time:d?.lead_time||'',bundle:d?.bundle||'',occasions:d?JSON.parse(d.occasions):[],detail_revision:d?.revision||0};});
 }
 function validImage(value){
  return typeof value==='string' && (((/^\/catalog-media\/[a-f0-9]{64}$/.test(value)) || (value.startsWith('/media/') && Object.hasOwn(assets,value) && assets[value][0].startsWith('image/'))) ||
@@ -35,6 +35,7 @@ async function dispatch(request,env){
  const origin=request.headers.get('Origin');
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
+ if(['/api/storefront','/api/admin/storefront','/api/recovery','/api/recovery/logout','/api/payment','/api/payment/receipt','/api/admin/receipts','/api/admin/receipt'].includes(p))return experienceRoute(request,env,p);
  if(['/api/admin/product-details','/api/reviews','/api/reviews/submit','/api/admin/reviews','/api/admin/review','/api/admin/finance','/api/admin/export'].includes(p)||p.startsWith('/review-photo/'))return commerceRoute(request,env,p);
  if(['/api/telegram/payment','/api/telegram/link','/api/telegram/unlink','/api/admin/telegram','/api/admin/telegram/setup','/api/admin/telegram/retry'].includes(p))return notificationRoute(request,env,p);
  if(p==='/api/admin/template')return templateRoute(request,env);
@@ -44,7 +45,7 @@ async function dispatch(request,env){
  if(p==='/api/admin/orders'&&method==='GET'){
   const before=url.searchParams.get('before')||'9999999999999';
   const stage=url.searchParams.get('stage')||'';if(stage&&!stages.includes(stage))return json({},400);
-  const rows=await env.DB.prepare("SELECT rowid AS cursor,* FROM orders WHERE rowid<? AND (?='' OR stage=?) ORDER BY rowid DESC LIMIT 40").bind(Number(before),stage,stage).all();return json(rows.results);
+  const rows=await env.DB.prepare("SELECT o.rowid AS cursor,o.*,f.received,f.agreed_total FROM orders o LEFT JOIN order_finance f ON f.order_id=o.id WHERE o.rowid<? AND (?='' OR o.stage=?) ORDER BY o.rowid DESC LIMIT 40").bind(Number(before),stage,stage).all();return json(rows.results);
  }
  if(/^\/api\/admin\/orders\/[a-f0-9-]{36}\/photo$/.test(p)&&method==='GET')return orderPhoto(env,p.split('/')[4],url.searchParams.has('download'));
  if(p==='/admin'&&method==='GET')return new Response(adminPage,{headers:{...noCache,'Content-Type':'text/html; charset=utf-8','Referrer-Policy':'no-referrer'}});
@@ -82,6 +83,8 @@ async function dispatch(request,env){
   let raw;try{raw=await (await limitedBody(request,1850000)).text();}catch{return json({},413);}if(raw.length>1850000)return json({error:'Rasm hajmi katta'},413);
   let v;try{v=JSON.parse(raw)}catch{return json({},400)}
   if(!v||![['name',100],['description',350],['category',60]].every(([key,max])=>typeof v[key]==='string'&&v[key].trim().length>0&&v[key].length<=max)||!(v.price===null||Number.isSafeInteger(v.price)&&v.price>=0&&v.price<=1e12)||![0,1].includes(v.visible))return json({error:'Maydonlarni tekshiring'},400);
+  v.sale_price=v.sale_price??null;
+  if(v.sale_price!==null&&(!integer(v.sale_price,0,1e12)||v.price===null||v.sale_price>=v.price))return json({error:'Chegirma narxi asosiy narxdan kichik bo‘lishi kerak.'},400);
   const images=v.images??[v.image];
   if(!Array.isArray(images)||images.length<1||images.length>10||!images.every(validImage))return json({error:'1–10 ta JPG, PNG yoki WebP rasm tanlang.'},400);
   const stored=[];
@@ -92,12 +95,12 @@ async function dispatch(request,env){
    const key='catalog-media/'+await digest(bytes);await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});
    stored.push('/'+key);
   }
-  const args=[v.name.trim(),v.description.trim(),v.category.trim(),v.price,JSON.stringify(stored),v.visible];
-  if(v.id===null){await env.DB.prepare('INSERT INTO products(id,name,description,category,price,image,visible) SELECT max(3,coalesce(max(id),3))+1,?,?,?,?,?,? FROM products').bind(...args).run();}
+  const args=[v.name.trim(),v.description.trim(),v.category.trim(),v.price,JSON.stringify(stored),v.visible,v.sale_price];
+  if(v.id===null){await env.DB.prepare('INSERT INTO products(id,name,description,category,price,image,visible,sale_price) SELECT max(3,coalesce(max(id),3))+1,?,?,?,?,?,?,? FROM products').bind(...args).run();}
   else{
    if(!Number.isSafeInteger(v.id)||!Number.isSafeInteger(v.revision))return json({},400);
-   const result=v.revision===0&&initial[v.id]?await env.DB.prepare('INSERT OR IGNORE INTO products(id,name,description,category,price,image,visible) VALUES(?,?,?,?,?,?,?)').bind(v.id,...args).run():
-   await env.DB.prepare('UPDATE products SET name=?,description=?,category=?,price=?,image=?,visible=?,revision=revision+1 WHERE id=? AND revision=?').bind(...args,v.id,v.revision).run();
+   const result=v.revision===0&&initial[v.id]?await env.DB.prepare('INSERT OR IGNORE INTO products(id,name,description,category,price,image,visible,sale_price) VALUES(?,?,?,?,?,?,?,?)').bind(v.id,...args).run():
+   await env.DB.prepare('UPDATE products SET name=?,description=?,category=?,price=?,image=?,visible=?,sale_price=?,revision=revision+1 WHERE id=? AND revision=?').bind(...args,v.id,v.revision).run();
    if(!result.meta.changes)return json({error:'Mahsulot boshqa oynada yangilangan. Sahifani yangilang.'},409);
   }
   cachedCatalog=undefined;

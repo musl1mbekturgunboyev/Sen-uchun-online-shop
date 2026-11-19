@@ -64,4 +64,5 @@ async function orderHistoryKey() {
   };
   el('historyClose').onclick = () => panel.close();
   more.onclick = renderPage;
+  document.addEventListener('history-refresh',()=>{cursor=null;rows.replaceChildren();renderPage();});
 })();

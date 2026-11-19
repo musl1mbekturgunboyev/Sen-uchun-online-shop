@@ -30,6 +30,8 @@ async function flushNotifications(env){
    }
   }
   await env.DB.prepare('DELETE FROM telegram_links WHERE expires<?').bind(Date.now()).run();
+  await env.DB.prepare('DELETE FROM recovery_codes WHERE expires<?').bind(Date.now()).run();
+  await env.DB.prepare('DELETE FROM recovered_access WHERE expires<?').bind(Date.now()).run();
  }finally{sendingNotifications=false;}
 }
 async function notificationRoute(request,env,path){
@@ -83,8 +85,12 @@ async function telegramWebhook(request,env){
  if(await env.DB.prepare('SELECT id FROM notifications WHERE id=?').bind('update:'+data.update_id).first())return json({ok:true});
  const m=data?.message;if(!m||m.chat?.type!=='private'||m.from?.is_bot||m.chat.id!==m.from?.id||typeof m.text!=='string')return json({ok:true});
  const chat=String(m.chat.id),match=/^\/start(?:@[A-Za-z0-9_]+)?(?: ([a-f0-9]{48}))?$/.exec(m.text.trim());
- let answer='Buyurtma saytida «Telegramda xabar olish» tugmasini bosing. Sizning chat ID: '+chat;
- if(m.text.trim()==='/stop'){
+ let answer='Buyurtma saytida «Telegramda xabar olish» tugmasini bosing. Buyurtmalarni boshqa telefonda tiklash: /orders. Sizning chat ID: '+chat;
+ if(m.text.trim()==='/orders'){
+  const code='SU-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+  await env.DB.batch([env.DB.prepare('DELETE FROM recovery_codes WHERE chat_id=? OR expires<?').bind(chat,Date.now()),env.DB.prepare('INSERT INTO recovery_codes VALUES(?,?,?)').bind(await digest(code),chat,Date.now()+600000)]);
+  answer='Sen uchun — buyurtmalarni tiklash\n'+code+'\nSaytda Buyurtmalarim → Boshqa telefonda tiklash bo‘limiga kiriting. Kod 10 daqiqa amal qiladi, bir marta ishlaydi. Uni boshqa odamga bermang. Faqat shu botga bog‘langan buyurtmalar ochiladi.';
+ }else if(m.text.trim()==='/stop'){
   await env.DB.prepare('UPDATE orders SET telegram_chat=NULL WHERE telegram_chat=?').bind(chat).run();answer='Barcha buyurtma bildirishnomalari to‘xtatildi.';
  }else if(match?.[1]){
   // Atomic, single use capability. The tracking secret itself never enters Telegram.

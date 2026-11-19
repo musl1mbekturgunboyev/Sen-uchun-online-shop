@@ -17,7 +17,7 @@ async function customerOrders(request, env) {
  if(!/^\d{1,19}$/.test(before))return json({},400);
  const stage=new URL(request.url).searchParams.get('stage')||'';
  if(stage&&!stages.includes(stage))return json({},400);
- const rows=await env.DB.prepare("SELECT rowid AS cursor,id,created,product,qty,stage,tracking FROM orders WHERE customer_hash=? AND rowid<CAST(? AS INTEGER) AND (?='' OR stage=?) ORDER BY rowid DESC LIMIT 41").bind(hash,before,stage,stage).all();
+ const rows=await env.DB.prepare("SELECT rowid AS cursor,id,created,product,qty,stage,tracking FROM orders WHERE (customer_hash=? OR telegram_chat IN (SELECT chat_id FROM recovered_access WHERE customer_hash=? AND expires>?)) AND rowid<CAST(? AS INTEGER) AND (?='' OR stage=?) ORDER BY rowid DESC LIMIT 41").bind(hash,hash,Date.now(),before,stage,stage).all();
  return json({orders:rows.results.slice(0,40), more:rows.results.length>40});
 }
 async function acceptOrder(request,env){
@@ -34,7 +34,8 @@ async function acceptOrder(request,env){
  const prior=await existing();if(prior)return receipt(prior);
  const productId=f.get('product');
  if(typeof productId!=='string'||!/^\d+$/.test(productId))return json({},400);
- const product=await env.DB.prepare('SELECT name,visible,price FROM products WHERE id=?').bind(Number(productId)).first()??initial[Number(productId)];
+ const product=await env.DB.prepare('SELECT name,visible,price,sale_price FROM products WHERE id=?').bind(Number(productId)).first()??initial[Number(productId)];
+ if(product?.sale_price!=null&&product.price!=null&&product.sale_price<product.price)product.price=product.sale_price;
  if(!product?.visible)return json({error:'Mahsulot katalogda mavjud emas.'},400);
  const file=f.get('photo');let bytes,mime='',filename='';
  if(file!==null){

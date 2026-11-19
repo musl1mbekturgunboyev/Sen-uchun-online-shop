@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import app from '../dist/cloudflare/index.js';
+process.env.TEST_ONLY='1';const {DB,BUCKET}=await import('./preview.mjs');
+const origin='https://shop.test',env={DB,BUCKET,ADMIN_PASSWORD:crypto.randomUUID(),TELEGRAM_BOT_TOKEN:'test',TELEGRAM_ADMIN_CHAT_ID:'123',TELEGRAM_WEBHOOK_SECRET:'a'.repeat(40)};
+const auth={Authorization:'Basic '+btoa('admin:'+env.ADMIN_PASSWORD)},h1={'X-Order-Key':'1'.repeat(64)},h2={'X-Order-Key':'2'.repeat(64)};
+const call=(path,method='GET',body,headers={})=>app.fetch(new Request(origin+path,{method,body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body),headers:{Origin:origin,...headers}}),env);
+const product={id:1,revision:0,name:'Sovg‘a',description:'Sinov',category:'Quti',price:50000,sale_price:40000,images:['/media/box.jpg'],visible:1};
+assert.equal((await call('/api/admin/product','POST',product,auth)).status,200);
+assert.equal((await call('/api/admin/product','POST',{...product,revision:1,sale_price:60000},auth)).status,400);
+let catalog=await (await call('/api/catalog')).json(),p=catalog.products.find(x=>x.id===1);assert.equal(p.price,40000);assert.equal(p.original_price,50000);assert.equal(p.discount_percent,20);
+const cfg=await (await call('/api/gifts?product=1')).json();
+async function order(total){const form=new FormData();for(const [k,v] of Object.entries({id:crypto.randomUUID(),product:1,qty:2,note:'Test',contact:'Test'}))form.set(k,v);form.set('gift',JSON.stringify({signature:JSON.stringify(cfg),method:'agree',extras:[],address:'',time:'',total,design:null}));return call('/api/orders','POST',form,h1);}
+assert.equal((await order(1)).status,400);const receipt=await (await order(80000)).json();assert.ok(receipt.tracking);const key={'X-Tracking-Key':receipt.tracking};
+assert.equal((await call('/api/payment')).status,404);
+assert.equal((await (await call('/api/payment','GET',undefined,key)).json()).status,'To‘lov kutilmoqda');
+const jpg=fs.readFileSync('public/media/photo.jpg');
+function upload(amount=30000,bytes=jpg){const f=new FormData();f.set('amount',amount);f.set('photo',new Blob([bytes]),'check.jpg');return f;}
+assert.equal((await call('/api/payment/receipt','POST',upload())).status,404);
+assert.equal((await call('/api/payment/receipt','POST',upload(1,'not an image'),key)).status,415);
+assert.equal((await call('/api/payment/receipt','POST',upload(),key)).status,200);
+assert.equal((await call('/api/payment/receipt','POST',upload(),key)).status,409);
+const list=await (await call('/api/admin/receipts','GET',undefined,auth)).json(),r=list.receipts[0];
+assert.equal((await call('/api/admin/receipt?id='+r.id)).status,404);
+assert.equal((await call('/api/admin/receipt?id='+r.id,'GET',undefined,auth)).status,200);
+assert.equal((await call('/api/admin/receipt','POST',{id:r.id,status:'approved',note:'',revision:5},auth)).status,409);
+assert.equal((await call('/api/admin/receipt','POST',{id:r.id,status:'approved',note:'Bankdan tekshirildi',revision:0},auth)).status,200);
+assert.equal((await call('/api/admin/receipt','POST',{id:r.id,status:'approved',note:'',revision:1},auth)).status,409);
+let pay=await (await call('/api/payment','GET',undefined,key)).json();assert.equal(pay.received,30000);assert.equal(pay.status,'Qisman to‘langan');assert.equal(pay.balance,50000);
+assert.equal((await call('/api/payment/receipt','POST',upload(50000),key)).status,200);
+const second=(await (await call('/api/admin/receipts','GET',undefined,auth)).json()).receipts[0];
+assert.equal((await call('/api/admin/receipt','POST',{id:second.id,status:'approved',note:'',revision:1},auth)).status,200);
+pay=await (await call('/api/payment','GET',undefined,key)).json();assert.equal(pay.received,80000);assert.equal(pay.status,'To‘langan');
+assert.equal((await call('/api/admin/storefront','POST',{season:'winter',revision:0})).status,404);
+assert.equal((await call('/api/admin/storefront','POST',{season:'winter',revision:0},auth)).status,200);
+assert.equal((await call('/api/admin/storefront','POST',{season:'summer',revision:0},auth)).status,409);
+assert.equal((await (await call('/api/storefront')).json()).season,'winter');
+// A linked Telegram chat gets a one-time recovery code. Other chats cannot recover its orders.
+await DB.prepare('UPDATE orders SET telegram_chat=? WHERE id=?').bind('456',receipt.id).run();
+const hook={'X-Telegram-Bot-Api-Secret-Token':env.TELEGRAM_WEBHOOK_SECRET,Origin:'https://telegram.test'};
+const update={update_id:600,message:{text:'/orders',chat:{type:'private',id:456},from:{id:456}}};
+assert.equal((await call('/api/telegram/webhook','POST',update)).status,403);
+assert.equal((await call('/api/telegram/webhook','POST',update,hook)).status,200);
+const notification=await DB.prepare('SELECT text FROM notifications WHERE id=?').bind('update:600').first(),code=/SU-[a-f0-9]{32}/.exec(notification.text)[0];
+assert.equal((await (await call('/api/my-orders','GET',undefined,h2)).json()).orders.length,0);
+assert.equal((await call('/api/recovery','POST',{code},h2)).status,200);
+assert.equal((await call('/api/recovery','POST',{code},h2)).status,400);
+assert.equal((await (await call('/api/my-orders','GET',undefined,h2)).json()).orders[0].id,receipt.id);
+assert.equal((await (await call('/api/my-orders?stage=Topshirildi','GET',undefined,h2)).json()).orders.length,0);
+await call('/api/recovery/logout','POST',{},h2);
+assert.equal((await (await call('/api/my-orders','GET',undefined,h2)).json()).orders.length,0);
+await call('/api/telegram/webhook','POST',{...update,update_id:601,message:{...update.message,chat:{type:'private',id:999},from:{id:999}}},hook);
+const otherCode=/SU-[a-f0-9]{32}/.exec((await DB.prepare('SELECT text FROM notifications WHERE id=?').bind('update:601').first()).text)[0];
+await call('/api/recovery','POST',{code:otherCode},h2);assert.equal((await (await call('/api/my-orders','GET',undefined,h2)).json()).orders.length,0);
+// Expired capabilities cannot restore a session.
+await call('/api/telegram/webhook','POST',{...update,update_id:602},hook);
+const expired=/SU-[a-f0-9]{32}/.exec((await DB.prepare('SELECT text FROM notifications WHERE id=?').bind('update:602').first()).text)[0];
+await DB.prepare('UPDATE recovery_codes SET expires=0').run();assert.equal((await call('/api/recovery','POST',{code:expired},h2)).status,400);
+// Rejection never changes money; a new receipt may be submitted afterwards.
+assert.equal((await call('/api/payment/receipt','POST',upload(100),key)).status,200);
+const rejected=(await (await call('/api/admin/receipts','GET',undefined,auth)).json()).receipts[0];
+assert.equal((await call('/api/admin/receipt','POST',{id:rejected.id,status:'rejected',note:'Bankda topilmadi'},auth)).status,200);
+assert.equal((await (await call('/api/payment','GET',undefined,key)).json()).received,80000);
+console.log('PASS discount checkout validation, receipt privacy/approval/idempotency/partial payment, season CAS, Telegram recovery isolation/single-use/logout');
