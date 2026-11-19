@@ -1,0 +1,19 @@
+// Minimal OOXML writer: text is inlineStr (never executable spreadsheet formulas).
+function makeWorkbook(sheets){
+ const enc=new TextEncoder(),xml=s=>String(s).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+ const files=[],add=(name,text)=>files.push([enc.encode(name),enc.encode(text)]);
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ add('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>');
+ add('_rels/.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+ add('xl/workbook.xml','<workbook xmlns="'+ns+'" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map(([name],i)=>'<sheet name="'+xml(name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets></workbook>');
+ add('xl/_rels/workbook.xml.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'</Relationships>');
+ const col=n=>{let s='';for(n++;n;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;};
+ sheets.forEach(([name,rows],i)=>add('xl/worksheets/sheet'+(i+1)+'.xml','<worksheet xmlns="'+ns+'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="14" width="24" customWidth="1"/></cols><sheetData>'+rows.map((r,ri)=>'<row r="'+(ri+1)+'">'+r.map((v,ci)=>'<c r="'+col(ci)+(ri+1)+'"'+(typeof v==='number'?' t="n"><v>'+v+'</v>':' t="inlineStr"><is><t xml:space="preserve">'+xml(v)+'</t></is>')+'</c>').join('')+'</row>').join('')+'</sheetData><autoFilter ref="A1:'+col(rows[0].length-1)+rows.length+'"/></worksheet>'));
+ const chunks=[],central=[];let offset=0;
+ const crc=bytes=>{let c=0xffffffff;for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;};
+ const head=(length,signature)=>{const b=new Uint8Array(length),d=new DataView(b.buffer);d.setUint32(0,signature,true);return [b,d];};
+ for(const [name,bytes] of files){const sum=crc(bytes),[h,d]=head(30,0x04034b50);d.setUint16(4,20,true);d.setUint16(6,0x800,true);d.setUint32(14,sum,true);d.setUint32(18,bytes.length,true);d.setUint32(22,bytes.length,true);d.setUint16(26,name.length,true);chunks.push(h,name,bytes);
+ const [c,v]=head(46,0x02014b50);v.setUint16(4,20,true);v.setUint16(6,20,true);v.setUint16(8,0x800,true);v.setUint32(16,sum,true);v.setUint32(20,bytes.length,true);v.setUint32(24,bytes.length,true);v.setUint16(28,name.length,true);v.setUint32(42,offset,true);central.push(c,name);offset+=h.length+name.length+bytes.length;}
+ const size=central.reduce((sum,b)=>sum+b.length,0),[end,d]=head(22,0x06054b50);d.setUint16(8,files.length,true);d.setUint16(10,files.length,true);d.setUint32(12,size,true);d.setUint32(16,offset,true);
+ return new Blob([...chunks,...central,end]);
+}

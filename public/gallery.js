@@ -51,7 +51,7 @@ function showPhoto(index){
  for(const id of ['prev','next','zPrev','zNext'])get(id).hidden=photos.length<2;
 }
 function openProduct(p){
- activeProduct=p;get('dName').textContent=p.name;get('dText').textContent=p.desc;get('dPrice').textContent=priceText(p);get('thumbs').replaceChildren();
+ activeProduct=p;loadProductExtras(p);get('dName').textContent=p.name;get('dText').textContent=p.desc;get('dPrice').textContent=priceText(p);get('thumbs').replaceChildren();
  if(p.images.length>1)p.images.forEach((src,i)=>{const b=document.createElement('button'),img=new Image();img.src=src;img.width=50;img.height=50;img.loading='lazy';img.alt=(i+1)+'-rasm';b.append(img);b.onclick=()=>showPhoto(i);get('thumbs').append(b)});
  showPhoto(0);get('detail').showModal();get('detail').scrollTop=0;
 }

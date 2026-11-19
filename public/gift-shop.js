@@ -28,6 +28,7 @@ async function setupGift(product){
    const wrapper=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.value=key;
    wrapper.append(input,' '+label+' · '+money(settings[key])+' / dona');extras.append(wrapper);
   }
+  showDeliveryInfo(giftEl('checkoutTerms'),settings);
   giftEl('giftOptions').hidden=false;refreshGift();
  }catch{if(session===orderId)giftEl('orderError').textContent='Buyurtma sozlamalari yuklanmadi. Buyurtma oynasini qayta oching.';}
 }
@@ -75,9 +76,9 @@ function checkoutGift(){
 function trackingLink(token){return location.origin+'/#buyurtma='+token;}
 async function openTracking(){
  const token=/^#buyurtma=([a-f0-9-]{36})$/.exec(location.hash)?.[1];if(!token)return;
- const box=giftEl('trackDialog');if(!box.open)box.showModal();
+ const box=giftEl('trackDialog');giftEl('trackingActions').replaceChildren();giftEl('tracked').textContent='Yuklanmoqda…';if(!box.open)box.showModal();
  try{const r=await fetch('/api/track',{headers:{'X-Tracking-Key':token},cache:'no-store'});if(!r.ok)throw Error();
- const o=await r.json();giftEl('tracked').textContent=o.product+' · '+o.qty+' dona · '+o.stage;
+ const o=await r.json();giftEl('tracked').textContent=o.product+' · '+o.qty+' dona · '+o.stage;showTrackingActions(token,o);
  }catch{giftEl('tracked').textContent='Buyurtma topilmadi yoki ulanish uzildi.';}
 }
 giftEl('trackClose').onclick=()=>{giftEl('trackDialog').close();history.replaceState(null,'',location.pathname+location.search);};

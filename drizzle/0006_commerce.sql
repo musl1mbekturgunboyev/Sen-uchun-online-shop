@@ -1,0 +1,11 @@
+CREATE TABLE product_details(product INTEGER PRIMARY KEY, lead_time TEXT NOT NULL DEFAULT '', bundle TEXT NOT NULL DEFAULT '', occasions TEXT NOT NULL DEFAULT '[]', revision INTEGER NOT NULL DEFAULT 1);
+ALTER TABLE orders ADD COLUMN product_id INTEGER;
+ALTER TABLE orders ADD COLUMN telegram_chat TEXT;
+ALTER TABLE orders ADD COLUMN stage_version INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE order_finance(order_id TEXT PRIMARY KEY, received INTEGER NOT NULL DEFAULT 0, cost INTEGER NOT NULL DEFAULT 0, agreed_total INTEGER, note TEXT NOT NULL DEFAULT '', revision INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE reviews(id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE, product_id INTEGER, product TEXT NOT NULL, name TEXT NOT NULL, rating INTEGER NOT NULL, text TEXT NOT NULL, photo_key TEXT, mime TEXT, consent INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created INTEGER NOT NULL);
+CREATE INDEX reviews_public ON reviews(status,created);
+CREATE TABLE integrations(id INTEGER PRIMARY KEY CHECK(id=1), bot_username TEXT NOT NULL);
+CREATE TABLE telegram_links(token_hash TEXT PRIMARY KEY, order_id TEXT NOT NULL, expires INTEGER NOT NULL);
+CREATE TABLE notifications(id TEXT PRIMARY KEY, order_id TEXT NOT NULL, kind TEXT NOT NULL, chat_id TEXT NOT NULL, text TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt INTEGER NOT NULL DEFAULT 0, lease_until INTEGER NOT NULL DEFAULT 0, sent_at INTEGER, last_error TEXT NOT NULL DEFAULT '');
+CREATE INDEX notifications_due ON notifications(sent_at,next_attempt,lease_until);

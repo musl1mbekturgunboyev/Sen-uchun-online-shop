@@ -18,7 +18,8 @@ async function catalog(db,editing=false){
   const images=decodeImages(row.image).map((src,index)=>!editing&&src.startsWith('data:')?'/product-image/'+row.id+'?i='+index+'&v='+row.revision:src);
   merged.set(row.id,{...row,image:images[0],images});
  }
- return [...merged.values()];
+ const details=(await db.prepare('SELECT * FROM product_details').all()).results;
+ return [...merged.values()].map(p=>{const d=details.find(d=>d.product===p.id);return {...p,lead_time:d?.lead_time||'',bundle:d?.bundle||'',occasions:d?JSON.parse(d.occasions):[],detail_revision:d?.revision||0};});
 }
 function validImage(value){
  return typeof value==='string' && (((/^\/catalog-media\/[a-f0-9]{64}$/.test(value)) || (value.startsWith('/media/') && Object.hasOwn(assets,value) && assets[value][0].startsWith('image/'))) ||
@@ -30,9 +31,12 @@ async function dispatch(request,env){
  const url=new URL(request.url),p=url.pathname,method=request.method,owner=await ownerAccess(request,env);
  if(standalone&&p==='/admin'&&!owner)return new Response('Admin kirishi',{status:401,headers:{...noCache,'WWW-Authenticate':'Basic realm="Sen uchun", charset="UTF-8"'}});
  if((p==='/admin'||p.startsWith('/api/admin'))&&!owner)return new Response('Topilmadi',{status:404,headers:noCache});
+ if(p==='/api/telegram/webhook')return telegramWebhook(request,env);
  const origin=request.headers.get('Origin');
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
+ if(['/api/admin/product-details','/api/reviews','/api/reviews/submit','/api/admin/reviews','/api/admin/review','/api/admin/finance','/api/admin/export'].includes(p)||p.startsWith('/review-photo/'))return commerceRoute(request,env,p);
+ if(['/api/telegram/link','/api/telegram/unlink','/api/admin/telegram','/api/admin/telegram/setup','/api/admin/telegram/retry'].includes(p))return notificationRoute(request,env,p);
  if(p==='/api/admin/template')return templateRoute(request,env);
  if(['/api/gifts','/api/track','/api/admin/gifts','/api/admin/stage'].includes(p))return giftRoute(request,env,p);
  if(p==='/api/my-orders'&&method==='GET')return customerOrders(request,env);
@@ -107,4 +111,4 @@ async function dispatch(request,env){
  if(range){const start=+range[1],end=range[2]?Math.min(bytes.length-1,+range[2]):bytes.length-1;if(start>end)return new Response(null,{status:416});headers['Content-Range']='bytes '+start+'-'+end+'/'+bytes.length;bytes=bytes.subarray(start,end+1);}
  return new Response(method==='HEAD'?null:bytes,{status:range?206:200,headers});
 }
-export default {async fetch(request,env){try{return secure(await dispatch(request,env))}catch(error){console.error(error.message);return json({error:'Server so‘rovni bajara olmadi'},500)}}};
+export default {async fetch(request,env,ctx){try{const response=await dispatch(request,env);if(ctx&&request.method==='POST'&&response.ok&&env.TELEGRAM_BOT_TOKEN)ctx.waitUntil(flushNotifications(env));return secure(response)}catch(error){console.error(error.message);return json({error:'Server so‘rovni bajara olmadi'},500)}},async scheduled(event,env,ctx){ctx.waitUntil(flushNotifications(env));}};

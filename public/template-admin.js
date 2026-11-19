@@ -36,7 +36,7 @@ async function openTemplateEditor(product){
    }
   }
   const color=field(form,'Ism rangi','color',t.label.color),size=field(form,'Shrift o‘lchami (maket bo‘yining %)','number',t.label.size);size.min=1;size.max=30;size.step=1;size.required=true;
-  const sample=field(form,'Tekshirish uchun ism','text','Gulsevar');sample.maxLength=80;
+  const sample=field(form,'Tekshirish uchun ism','text','Sizning ismingiz');sample.maxLength=80;
   const save=document.createElement('button');save.type='submit';save.className='primary';save.textContent='Maketni saqlash';form.append(save);
   layout.append(preview,form);dialog.append(layout);
   function read(){

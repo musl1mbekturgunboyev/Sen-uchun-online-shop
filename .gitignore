@@ -4,3 +4,5 @@ wrangler.json
 .dev.vars
 .env
 node_modules/
+
+wrangler.backup-*.json

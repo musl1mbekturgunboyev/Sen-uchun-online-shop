@@ -1,10 +1,10 @@
 const stages=['Qabul qilindi','Tayyorlanmoqda','Tayyor','Topshirildi'];
-const giftDefaults={width:0,height:0,pickup:'',delivery:null,photo:null,card:null,bag:null};
+const giftDefaults={width:0,height:0,pickup:'',delivery:null,photo:null,card:null,bag:null,deliveryAreas:'',deliveryTime:'',deliveryTerms:''};
 const integer=(x,min,max)=>Number.isSafeInteger(x)&&x>=min&&x<=max;
 async function giftSettings(env,id){
  const row=await env.DB.prepare('SELECT settings FROM gift_settings WHERE id=1').first();
- const settings=row?JSON.parse(row.settings):giftDefaults;
- return id===undefined?settings:{...settings,template:await productTemplate(env,id)};
+ const settings={...giftDefaults,...(row?JSON.parse(row.settings):{})};
+ return id===undefined?settings:{...settings,template:await productTemplate(env,id),details:await productDetails(env,id)};
 }
 async function giftRoute(request,env,path){
  if(path==='/api/gifts'&&request.method==='GET'){
@@ -23,12 +23,17 @@ async function giftRoute(request,env,path){
  if(!data||typeof data!=='object')return json({},400);
  if(path==='/api/admin/stage'){
   if(!stages.includes(data.stage)||typeof data.id!=='string')return json({},400);
-  const r=await env.DB.prepare("UPDATE orders SET stage=? WHERE id=? AND COALESCE(stage,'')=?").bind(data.stage,data.id,data.previous||'').run();
-  return r.meta.changes?json({saved:true}):json({},409);
+  const change=env.DB.prepare("UPDATE orders SET stage=?,stage_version=stage_version+1 WHERE id=? AND COALESCE(stage,'')=?").bind(data.stage,data.id,data.previous||'');
+  const queue=env.DB.prepare("INSERT OR IGNORE INTO notifications(id,order_id,kind,chat_id,text) SELECT 'stage:'||id||':'||stage_version,id,'status',telegram_chat,?||product||? FROM orders WHERE id=? AND stage=? AND telegram_chat IS NOT NULL").bind('Sen uchun · ', '\nBuyurtma holati: '+data.stage,data.id,data.stage);
+  const results=await env.DB.batch([change,queue]);
+  return results[0].meta.changes?json({saved:true,notification:'queued'}):json({},409);
  }
  if(typeof data.pickup!=='string'||data.pickup.length>200||!integer(data.width,0,190)||!integer(data.height,0,277)||
   (!!data.width!==!!data.height)||['photo','bag','card','delivery'].some(k=>data[k]!==null&&!integer(data[k],0,100000000)))return json({},400);
- const clean=Object.fromEntries(Object.keys(giftDefaults).map(k=>[k,data[k]]));
+ for(const key of ['deliveryAreas','deliveryTime','deliveryTerms'])if(data[key]!==undefined&&(typeof data[key]!=='string'||data[key].length>1000))return json({},400);
+ const previous=await giftSettings(env);
+ const clean=Object.fromEntries(Object.keys(giftDefaults).map(k=>[k,data[k]??previous[k]??giftDefaults[k]]));
+ for(const k of ['photo','bag','card','delivery'])clean[k]=data[k];
  await env.DB.prepare('INSERT OR REPLACE INTO gift_settings VALUES(1,?)').bind(JSON.stringify(clean)).run();
  return json({saved:true});
 }
@@ -54,5 +59,5 @@ async function calculateGift(raw,env,product,id,qty,hasPhoto){
   design={text:d.text,x:d.x,y:d.y,zoom:d.zoom,width:t.width,height:t.height,template:t};
  }
  if(t?.enabled&&hasPhoto&&!design)throw Error();
- return {method:g.method,address:g.method==='pickup'?settings.pickup:g.address,time:g.time,extras,fee,total,unit:product.price,design};
+ return {method:g.method,address:g.method==='pickup'?settings.pickup:g.address,time:g.time,extras,fee,total,unit:product.price,design,leadTime:settings.details.lead_time,deliveryTerms:{areas:settings.deliveryAreas,time:settings.deliveryTime,terms:settings.deliveryTerms},bundle:settings.details.bundle};
 }

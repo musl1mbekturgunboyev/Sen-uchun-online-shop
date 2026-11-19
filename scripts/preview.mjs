@@ -8,6 +8,9 @@ for (const file of fs.readdirSync('drizzle').filter(f => f.endsWith('.sql')).sor
   sqlite.exec(fs.readFileSync('drizzle/'+file,'utf8'));
 }
 export const DB = {
+ async batch(statements){
+  sqlite.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sqlite.exec('COMMIT');return results;}catch(error){sqlite.exec('ROLLBACK');throw error;}
+ },
   prepare(sql) {
     const statement = sqlite.prepare(sql);
     let args = [];

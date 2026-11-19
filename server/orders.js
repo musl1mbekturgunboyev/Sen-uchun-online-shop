@@ -50,16 +50,14 @@ async function acceptOrder(request,env){
  const key=bytes?'orders/'+crypto.randomUUID():null;
  if(key)await env.BUCKET.put(key,bytes,{httpMetadata:{contentType:mime}});
  try{
-  await env.DB.prepare('INSERT INTO orders(id,created,product,qty,note,contact,filename,mime,size,object_key,customer_hash,tracking,stage,gift) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,Date.now(),product.name,qty,note,contact,filename,mime,bytes?.length||0,key,hash,tracking,stages[0],gift?JSON.stringify(gift):null).run();
+  const insert=env.DB.prepare('INSERT INTO orders(id,created,product,qty,note,contact,filename,mime,size,object_key,customer_hash,tracking,stage,gift,product_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id,Date.now(),product.name,qty,note,contact,filename,mime,bytes?.length||0,key,hash,tracking,stages[0],gift?JSON.stringify(gift):null,Number(productId));
+  const jobs=[insert];
+  if(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_ADMIN_CHAT_ID)jobs.push(env.DB.prepare('INSERT OR IGNORE INTO notifications(id,order_id,kind,chat_id,text) VALUES(?,?,?,?,?)').bind('new:'+id,id,'new',String(env.TELEGRAM_ADMIN_CHAT_ID),'Yangi buyurtma #'+id.slice(0,8)+'\n'+product.name+' — '+qty+' dona\n'+note+'\n'+contact+'\nJami: '+(gift?.total==null?'Kelishiladi':gift.total+' so‘m')));
+  await env.DB.batch(jobs);
  }catch(e){
   const saved=await env.DB.prepare('SELECT object_key,customer_hash,tracking FROM orders WHERE id=?').bind(id).first();
   if(key&&saved?.object_key!==key)await env.BUCKET.delete(key);
   if(saved)return receipt(saved);throw e;
- }
- if(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_ADMIN_CHAT_ID&&file){
-  const upload=new FormData();upload.set('chat_id',env.TELEGRAM_ADMIN_CHAT_ID);upload.set('document',file,filename);
-  upload.set('caption',(product.name+' — '+qty+' dona\n'+note+'\n'+contact+'\n#'+id.slice(0,8)).slice(0,1024));
-  try{const r=await fetch('https://api.telegram.org/bot'+env.TELEGRAM_BOT_TOKEN+'/sendDocument',{method:'POST',body:upload});return json({id,tracking,telegram:r.ok});}catch{return json({id,tracking,telegram:false});}
  }
  return json({id,tracking});
 }

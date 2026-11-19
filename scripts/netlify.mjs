@@ -7,6 +7,6 @@ if (url.protocol !== 'https:' || url.username || url.password || url.search || u
 const output = 'dist/netlify';
 fs.rmSync(output,{recursive:true,force:true});
 fs.cpSync('public',output,{recursive:true});
-const paths=['/api/*','/admin','/catalog-media/*','/product-image/*'];
+const paths=['/api/*','/admin','/catalog-media/*','/product-image/*','/review-photo/*'];
 const rules=paths.map(path=>path+' '+url.origin+path.replace('*',':splat')+' 200!');
 fs.writeFileSync(output+'/_redirects',rules.join('\n')+'\n');
