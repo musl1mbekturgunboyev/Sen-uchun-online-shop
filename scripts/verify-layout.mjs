@@ -15,3 +15,10 @@ assert.throws(()=>context.drawWrapper(canvas,photo,design,null));
 calls.length=0;context.drawWrapper(canvas,photo,{width:150,height:100,x:50,y:50,zoom:100,text:'Legacy'});
 assert.equal(calls.find(x=>x[0]==='text')[1],'Legacy');
 console.log('PASS product background, photo clipping, name region, dimensions and legacy layout');
+
+calls.length=0;
+context.drawWrapper(canvas,photo,{...design,layout:{photo:{x:0,y:0,w:50,h:50},label:{x:10,y:20,w:80,h:10,size:5,color:'#12abef'}}},background);
+assert.deepEqual(calls.filter(x=>x[0]==='clipRect'),[['clipRect',0,0,720,1080],['clipRect',144,432,1152,216]]);
+assert.equal(c.fillStyle,'#12abef');
+assert.deepEqual(calls.find(x=>x[0]==='text'),['text','Gulsevar',720,540]);
+console.log('PASS customer photo/text positions, font size and colour in print renderer');

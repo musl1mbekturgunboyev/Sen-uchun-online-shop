@@ -1,7 +1,7 @@
 const giftEl=id=>document.getElementById(id);
-let checkoutSettings,checkoutBackground,renderedDesign,customName=false;
+let checkoutSettings,checkoutBackground,renderedDesign,customName=false,customerLayout=null;
 async function setupGift(product){
- checkoutSettings=null;checkoutBackground=null;renderedDesign=null;customName=false;
+ checkoutSettings=null;checkoutBackground=null;renderedDesign=null;customName=false;customerLayout=null;
  const session=orderId;
  giftEl('giftOptions').hidden=true;
  try{
@@ -29,7 +29,7 @@ async function setupGift(product){
    wrapper.append(input,' '+label+' · '+money(settings[key])+' / dona');extras.append(wrapper);
   }
   showDeliveryInfo(giftEl('checkoutTerms'),settings);
-  giftEl('giftOptions').hidden=false;refreshGift();
+  giftEl('giftOptions').hidden=false;initLayoutEditor(settings.template);refreshGift();
  }catch{if(session===orderId)giftEl('orderError').textContent='Buyurtma sozlamalari yuklanmadi. Buyurtma oynasini qayta oching.';}
 }
 function giftSelection(){
@@ -41,7 +41,7 @@ function giftSelection(){
  const fee=method==='delivery'?cfg.delivery:0;
  const total=product.price==null?null:(product.price+additions)*qty+fee;
  const design=cfg.template?.enabled&&giftEl('file').files.length?{
-  width:cfg.template.width,height:cfg.template.height,template:cfg.template,templateRevision:cfg.template.revision,text:giftEl('wrapText').value.trim(),x:+giftEl('cropX').value,y:+giftEl('cropY').value,zoom:+giftEl('cropZoom').value
+  layout:customerLayout?structuredClone(customerLayout):null,width:cfg.template.width,height:cfg.template.height,template:cfg.template,templateRevision:cfg.template.revision,text:giftEl('wrapText').value.trim(),x:+giftEl('cropX').value,y:+giftEl('cropY').value,zoom:+giftEl('cropZoom').value
  }:null;
  return {signature:JSON.stringify(cfg),method,extras,address:method==='delivery'?giftEl('address').value.trim():'',time:method==='agree'?'':giftEl('needed').value.trim(),total,design,additional:additions*qty+fee};
 }
@@ -55,7 +55,7 @@ function refreshGift(){
  giftEl('approved').disabled=!g.design||!checkoutBackground||!giftEl('preview').naturalWidth;
  renderedDesign=null;
  if(checkoutBackground){
-  const design=g.design||{width:checkoutSettings.template.width,height:checkoutSettings.template.height,template:checkoutSettings.template,text:giftEl('wrapText').value.trim(),x:50,y:50,zoom:100};
+  const design=g.design||{layout:customerLayout,width:checkoutSettings.template.width,height:checkoutSettings.template.height,template:checkoutSettings.template,text:giftEl('wrapText').value.trim(),x:50,y:50,zoom:100};
   drawWrapper(giftEl('wrapper'),g.design?giftEl('preview'):null,design,checkoutBackground);
   if(g.design&&giftEl('preview').naturalWidth)renderedDesign=JSON.stringify(g.design);
  }

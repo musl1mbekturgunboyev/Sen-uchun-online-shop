@@ -63,3 +63,5 @@ html[data-theme=light][data-season=spring]{--brand:#98375c;--tint:#fbe8ef}html[d
 #order #ready>h2{font-size:28px}
 #order #ready>small{display:block;margin-right:40px}
 @media(max-width:600px){#order{width:calc(100% - 20px);max-height:90dvh;padding:22px 18px}#order #title{font-size:22px;padding-right:30px}#order .checkout-progress li{font-size:12px}}
+.layout-tabs{display:flex;gap:8px}.layout-tabs button{flex:1;border:1px solid currentColor;border-radius:10px;min-height:44px}.layout-tabs [aria-pressed=true]{background:#943e52;color:white}
+.layout-tools{margin:12px 0}.layout-tools label{display:grid;grid-template-columns:1fr auto;gap:8px}.layout-tools input{grid-column:1/-1}.layout-tools input[type=color]{width:100%;height:44px;padding:3px}.layout-tools output{font-variant-numeric:tabular-nums}.layout-stage{position:relative;width:100%;line-height:0}.layout-stage #wrapper{display:block;width:100%;height:auto;touch-action:none;cursor:move;margin:0;border:0}.layout-outline{position:absolute;pointer-events:none;border:2px dashed #008bff;box-shadow:0 0 0 1px #fff8;box-sizing:border-box}.layout-tools p{line-height:1.5}

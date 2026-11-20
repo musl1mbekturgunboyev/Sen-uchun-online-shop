@@ -14,7 +14,7 @@ async function giftRoute(request,env,path){
  }
  if(path==='/api/track'&&request.method==='GET'){
   const token=request.headers.get('X-Tracking-Key')||'';
-  if(!/^[a-f0-9-]{36}$/.test(token))return json({},404);
+  if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(token))return json({},404);
   const row=await env.DB.prepare('SELECT product,qty,stage FROM orders WHERE tracking=?').bind(token).first();
   return row?json(row):json({},404);
  }
@@ -56,7 +56,14 @@ async function calculateGift(raw,env,product,id,qty,hasPhoto){
  if(g.design){
   const d=g.design;
   if(!t?.enabled||!hasPhoto||d.templateRevision!==t.revision||typeof d.text!=='string'||d.text.length>80||!integer(d.x,0,100)||!integer(d.y,0,100)||!integer(d.zoom,100,300))throw Error();
-  design={text:d.text,x:d.x,y:d.y,zoom:d.zoom,width:t.width,height:t.height,template:t};
+  let layout=null;
+  if(d.layout!=null){
+   const l=d.layout;
+   if(!templateRegion(l.photo)||!templateRegion(l.label)||typeof l.label.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(l.label.color)||!integer(l.label.size,1,30))throw Error();
+   const region=r=>({x:r.x,y:r.y,w:r.w,h:r.h});
+   layout={photo:region(l.photo),label:{...region(l.label),color:l.label.color,size:l.label.size}};
+  }
+  design={text:d.text,x:d.x,y:d.y,zoom:d.zoom,width:t.width,height:t.height,template:t,...(layout?{layout}:{})};
  }
  if(t?.enabled&&hasPhoto&&!design)throw Error();
  return {method:g.method,address:g.method==='pickup'?settings.pickup:g.address,time:g.time,extras,fee,total,unit:product.price,design,leadTime:settings.details.lead_time,deliveryTerms:{areas:settings.deliveryAreas,time:settings.deliveryTime,terms:settings.deliveryTerms},bundle:settings.details.bundle};

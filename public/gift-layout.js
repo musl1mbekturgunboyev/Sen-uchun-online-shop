@@ -17,14 +17,14 @@ function drawWrapper(canvas,image,design,background){
   canvas.width=Math.round(design.width*12);canvas.height=Math.round(design.height*12);
   const w=canvas.width,h=canvas.height,c=canvas.getContext('2d');
   c.fillStyle='#ffffff';c.fillRect(0,0,w,h);c.drawImage(background,0,0,w,h);
-  const r=t.photo,px=r.x*w/100,py=r.y*h/100,pw=r.w*w/100,ph=r.h*h/100;
+  const r=design.layout?.photo||t.photo,px=r.x*w/100,py=r.y*h/100,pw=r.w*w/100,ph=r.h*h/100;
   if(image?.naturalWidth){
    const scale=Math.max(pw/image.naturalWidth,ph/image.naturalHeight)*design.zoom/100;
    const iw=image.naturalWidth*scale,ih=image.naturalHeight*scale;
    c.save();c.beginPath();c.rect(px,py,pw,ph);c.clip();
    c.drawImage(image,px+(pw-iw)*design.x/100,py+(ph-ih)*design.y/100,iw,ih);c.restore();
   }
-  const a=t.label,ax=a.x*w/100,ay=a.y*h/100,aw=a.w*w/100,ah=a.h*h/100;
+  const a=design.layout?.label||t.label,ax=a.x*w/100,ay=a.y*h/100,aw=a.w*w/100,ah=a.h*h/100;
   c.save();c.beginPath();c.rect(ax,ay,aw,ah);c.clip();c.fillStyle=a.color;c.textAlign='center';c.textBaseline='middle';
   let size=Math.min(h*a.size/100,ah*.8);c.font='bold '+size+'px Georgia,serif';
   const text=design.text||'',measured=c.measureText(text).width;

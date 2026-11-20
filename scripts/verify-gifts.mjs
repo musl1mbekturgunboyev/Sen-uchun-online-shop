@@ -34,9 +34,18 @@ form.set('gift',JSON.stringify({...choice,design:null}));
 assert.equal((await call('/api/orders','POST',form)).status,400);
 form.set('gift',JSON.stringify({...choice,design:{...choice.design,templateRevision:999}}));
 assert.equal((await call('/api/orders','POST',form)).status,400);
+choice.design.layout={photo:{x:3,y:12,w:40,h:50},label:{x:5,y:68,w:70,h:22,color:'#12abef',size:12}};
+form.set('gift',JSON.stringify({...choice,design:{...choice.design,layout:{...choice.design.layout,photo:{x:90,y:0,w:30,h:30}}}}));
+assert.equal((await call('/api/orders','POST',form)).status,400);
+form.set('gift',JSON.stringify({...choice,design:{...choice.design,layout:{...choice.design.layout,label:{...choice.design.layout.label,color:'url(evil)'}}}}));
+assert.equal((await call('/api/orders','POST',form)).status,400);
 form.set('gift',JSON.stringify(choice));
 const receipt=await (await call('/api/orders','POST',form)).json();assert.ok(receipt.tracking);
 const stored=await (await call('/api/admin/orders','GET',undefined,admin)).json();
+assert.deepEqual(JSON.parse(stored[0].gift).design.layout,choice.design.layout);
+assert.match(receipt.tracking,/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+assert.notEqual(receipt.tracking,id);
+assert.equal((await call('/api/track','GET',undefined,{'X-Tracking-Key':'1'})).status,404);
 assert.equal(JSON.parse(stored[0].gift).design.width,150);assert.equal(JSON.parse(stored[0].gift).total,69000);
 assert.equal(JSON.parse(stored[0].gift).design.template.background,settings.template.background);
 // A subsequent template edit cannot change an already approved order.

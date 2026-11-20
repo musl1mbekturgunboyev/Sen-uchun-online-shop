@@ -7,7 +7,7 @@ async function requestData(request,max=4096){return JSON.parse(await (await limi
 const shortText=(v,max)=>typeof v==='string'&&v.length<=max;
 async function trackedOrder(request,env){
  const key=request.headers.get('X-Tracking-Key')||'';
- if(!/^[a-f0-9-]{36}$/.test(key))return null;
+ if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(key))return null;
  return env.DB.prepare('SELECT * FROM orders WHERE tracking=?').bind(key).first();
 }
 async function commerceRoute(request,env,path){
