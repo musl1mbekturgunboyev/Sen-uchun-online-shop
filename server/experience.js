@@ -1,9 +1,12 @@
 const seasonModes=['auto','spring','summer','autumn','winter','off'];
 async function paymentSummary(env,o){
- const f=await env.DB.prepare('SELECT received,agreed_total FROM order_finance WHERE order_id=?').bind(o.id).first();
+ const f=await env.DB.prepare('SELECT received,agreed_total,revision FROM order_finance WHERE order_id=?').bind(o.id).first();
  const total=f?.agreed_total??(o.gift?JSON.parse(o.gift).total:null),received=f?.received||0;
  const receipts=(await env.DB.prepare('SELECT id,amount,status,note,created FROM payment_receipts WHERE order_id=? ORDER BY created DESC LIMIT 20').bind(o.id).all()).results;
- return {total,received,balance:total==null?null:Math.max(0,total-received),status:total!=null&&received>=total?'To‘langan':received>0?'Qisman to‘langan':'To‘lov kutilmoqda',receipts};
+ const negotiated=(o.gift?JSON.parse(o.gift).total:null)==null;
+ const accepted=await env.DB.prepare('SELECT amount FROM quote_acceptances WHERE order_id=?').bind(o.id).first();
+ const needsAcceptance=negotiated&&(total==null||accepted?.amount!==total);
+ return {negotiated,needsAcceptance,quoteRevision:f?.revision||0,total,received,balance:total==null?null:Math.max(0,total-received),status:total!=null&&received>=total?'To‘langan':received>0?'Qisman to‘langan':'To‘lov kutilmoqda',receipts};
 }
 async function experienceRoute(request,env,path){
  const method=request.method,url=new URL(request.url);
@@ -32,9 +35,17 @@ async function experienceRoute(request,env,path){
  if(path==='/api/payment'&&method==='GET'){
   const o=await trackedOrder(request,env);return o?json(await paymentSummary(env,o)):json({},404);
  }
- if(path==='/api/payment/receipt'&&method==='POST'){
+ if(path==='/api/payment/accept'&&method==='POST'){
+  const o=await trackedOrder(request,env);if(!o)return json({},404);
+  let d;try{d=await requestData(request);}catch{return json({},400);}
+  if(!d||!integer(d.amount,0,1e12)||!integer(d.revision,1,1e9))return json({},400);
+  const result=await env.DB.prepare('INSERT INTO quote_acceptances(order_id,amount,accepted_at) SELECT order_id,agreed_total,? FROM order_finance WHERE order_id=? AND agreed_total=? AND revision=? ON CONFLICT(order_id) DO UPDATE SET amount=excluded.amount,accepted_at=excluded.accepted_at').bind(Date.now(),o.id,d.amount,d.revision).run();
+  return json({saved:!!result.meta.changes},result.meta.changes?200:409);
+ }
+ if(path==='/api/payment/receipt' &&method==='POST'){
   if(!await allowRequest(request,env,'receipt',12))return json({},429);
   const o=await trackedOrder(request,env);if(!o)return json({},404);
+  const payment=await paymentSummary(env,o);if(payment.needsAcceptance)return json({error:'Avval sotuvchi taklif qilgan narxni tasdiqlang.'},409);
   if(!request.headers.get('Content-Type')?.startsWith('multipart/form-data'))return json({},415);
   let form;try{form=await new Response(await limitedBody(request,3*1024*1024+4096),{headers:{'Content-Type':request.headers.get('Content-Type')}}).formData();}catch{return json({error:'Chek rasmi 3 MB dan oshmasin.'},413);}
   const file=form.get('photo'),amount=Number(form.get('amount'));

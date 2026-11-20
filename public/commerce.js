@@ -35,6 +35,7 @@ async function loadProductExtras(product){
 }
 function notificationButtons(container,token){
  paymentPanel(container,token);
+ const more=document.createElement('details');more.className='receipt-more';more.append(textNode('summary','Telegram bildirishnomalari'));container.append(more);container=more;
  const button=textNode('button','Telegramda holatni ko‘rish','telegram-action'),status=textNode('p','');button.type='button';status.setAttribute('role','status');container.append(button,status);
  button.onclick=async()=>{
   button.disabled=true;

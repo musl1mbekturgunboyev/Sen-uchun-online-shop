@@ -35,7 +35,7 @@ async function dispatch(request,env){
  const origin=request.headers.get('Origin');
  const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
- if(['/api/storefront','/api/admin/storefront','/api/recovery','/api/recovery/logout','/api/payment','/api/payment/receipt','/api/admin/receipts','/api/admin/receipt'].includes(p))return experienceRoute(request,env,p);
+ if(['/api/storefront','/api/admin/storefront','/api/recovery','/api/recovery/logout','/api/payment','/api/payment/accept','/api/payment/receipt','/api/admin/receipts','/api/admin/receipt'].includes(p))return experienceRoute(request,env,p);
  if(['/api/admin/product-details','/api/reviews','/api/reviews/submit','/api/admin/reviews','/api/admin/review','/api/admin/finance','/api/admin/export'].includes(p)||p.startsWith('/review-photo/'))return commerceRoute(request,env,p);
  if(['/api/telegram/payment','/api/telegram/link','/api/telegram/unlink','/api/admin/telegram','/api/admin/telegram/setup','/api/admin/telegram/retry'].includes(p))return notificationRoute(request,env,p);
  if(p==='/api/admin/template')return templateRoute(request,env);

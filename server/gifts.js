@@ -47,7 +47,7 @@ async function calculateGift(raw,env,product,id,qty,hasPhoto){
   amount+=settings[k];return {key:k,price:settings[k]};
  });
  const methods=['agree',...(settings.pickup?['pickup']:[]),...(settings.delivery!==null?['delivery']:[])];
- if(!methods.includes(g.method)||methods.length>1&&g.method==='agree'||typeof g.address!=='string'||g.address.length>240||typeof g.time!=='string'||g.time.length>80||g.method==='delivery'&&!g.address.trim()||g.method==='pickup'&&!g.time.trim())throw Error();
+ if(!methods.includes(g.method)||methods.length>1&&g.method==='agree'||typeof g.address!=='string'||g.address.length>240||typeof g.time!=='string'||g.time.length>80||g.method==='delivery'&&!g.address.trim())throw Error();
  const fee=g.method==='delivery'?settings.delivery:0;
  const total=product.price==null?null:(product.price+amount)*qty+fee;
  if(total!==g.total||g.signature!==JSON.stringify(settings))throw Error();

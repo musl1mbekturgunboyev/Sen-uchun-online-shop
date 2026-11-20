@@ -41,6 +41,7 @@ assert.equal((await call('/api/admin/finance','POST',{...finance,revision:1,cost
 const report=await call('/api/admin/export?from=2020-01-01&to=2030-12-31','GET',undefined,auth);assert.equal(report.status,200);fs.writeFileSync('dist/sen-uchun-report-test.xlsx',Buffer.from(await report.arrayBuffer()));
 assert.equal((await call('/api/admin/export?from=2026-02-31&to=2030-01-01','GET',undefined,auth)).status,400);
 
+await call('/api/payment/accept','POST',{amount:50000,revision:1},tracking);
 // Payment requests require the private order capability, use server prices, and deduplicate.
 assert.equal((await call('/api/telegram/payment','POST',{})).status,404);
 const payment=await (await call('/api/telegram/payment','POST',{total:1},tracking)).json();

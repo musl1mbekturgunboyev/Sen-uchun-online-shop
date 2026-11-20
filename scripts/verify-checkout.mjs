@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import app from '../dist/cloudflare/index.js';
+process.env.TEST_ONLY='1';const {DB,BUCKET}=await import('./preview.mjs');
+const origin='https://shop.test',env={DB,BUCKET,ADMIN_PASSWORD:crypto.randomUUID()};
+const auth={Authorization:'Basic '+btoa('admin:'+env.ADMIN_PASSWORD)};
+const call=(path,method='GET',body,headers={})=>app.fetch(new Request(origin+path,{method,headers:{Origin:origin,...headers},body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)}),env);
+await call('/api/admin/product','POST',{id:1,revision:0,name:'Kelishiladigan sovg‘a',description:'Test',category:'Quti',price:null,sale_price:null,images:['/media/box.jpg'],visible:1},auth);
+const cfg=await (await call('/api/gifts?product=1')).json();const form=new FormData();for(const [k,v] of Object.entries({id:crypto.randomUUID(),product:1,qty:1,note:'Test',contact:'Mijoz · +998901234567'}))form.set(k,v);form.set('gift',JSON.stringify({signature:JSON.stringify(cfg),method:'agree',extras:[],address:'',time:'',total:null,design:null}));
+const order=await (await call('/api/orders','POST',form,{'X-Order-Key':'3'.repeat(64)})).json();assert.ok(order.tracking);const key={'X-Tracking-Key':order.tracking};
+const summary=async()=> (await call('/api/payment','GET',undefined,key)).json();
+assert.equal((await summary()).needsAcceptance,true);
+assert.equal((await call('/api/payment/receipt','POST',new FormData(),key)).status,409);
+assert.equal((await call('/api/payment/accept','POST',{amount:50000,revision:1})).status,404);
+const finance={id:order.id,received:0,cost:0,agreed_total:50000,note:'',revision:0};
+assert.equal((await call('/api/admin/finance','POST',finance,auth)).status,200);
+assert.equal((await call('/api/payment/accept','POST',{amount:1,revision:1},key)).status,409);
+assert.equal((await call('/api/payment/accept','POST',{amount:50000,revision:1},key)).status,200);
+assert.equal((await summary()).needsAcceptance,false);
+assert.equal((await call('/api/admin/finance','POST',{...finance,agreed_total:60000,revision:1},auth)).status,200);
+assert.equal((await summary()).needsAcceptance,true);
+assert.equal((await call('/api/payment/accept','POST',{amount:50000,revision:1},key)).status,409);
+assert.equal((await call('/api/payment/receipt','POST',new FormData(),key)).status,409);
+assert.equal((await call('/api/payment/accept','POST',{amount:60000,revision:2},key)).status,200);
+assert.equal((await summary()).needsAcceptance,false);
+// Updating expenses alone must not revoke customer approval.
+assert.equal((await call('/api/admin/finance','POST',{...finance,agreed_total:60000,cost:20000,revision:2},auth)).status,200);
+assert.equal((await summary()).needsAcceptance,false);
+console.log('PASS quote privacy, exact amount/revision acceptance, changed-price invalidation and receipt gating');

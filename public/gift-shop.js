@@ -49,7 +49,7 @@ function refreshGift(){
  if(!checkoutSettings)return;
  const g=giftSelection();
  giftEl('addressBox').hidden=g.method!=='delivery';giftEl('address').required=g.method==='delivery';
- giftEl('timeBox').hidden=g.method==='agree';giftEl('needed').required=g.method==='pickup';
+ giftEl('timeBox').hidden=g.method==='agree';giftEl('needed').required=false;
  giftEl('giftTotal').textContent=g.total===null?'Mahsulot narxi kelishiladi. Qo‘shimchalar va yetkazish: '+money(g.additional):'Jami: '+money(g.total);
  giftEl('wrapEditor').hidden=!checkoutSettings.template?.enabled;giftEl('approved').required=!!g.design;
  giftEl('approved').disabled=!g.design||!checkoutBackground||!giftEl('preview').naturalWidth;

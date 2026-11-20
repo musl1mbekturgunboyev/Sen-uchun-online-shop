@@ -19,7 +19,7 @@ const fav=read('fav'),bag=read('bag');
 function toggle(set,key,id){if(set.has(id))set.delete(id);else set.add(id);try{localStorage.setItem('sen-'+key,JSON.stringify([...set]));}catch{}}
 function showOrder(id){
  orderId=crypto.randomUUID();get('orderError').textContent='';selectedId=id;const item=services.find(p=>p.id===id);if(!item)return;service=item.name+(item.price===null?'':' ('+item.price.toLocaleString()+' so‘m)');track('open',id); get('form').reset();clearPreview();get('title').textContent=service;
- get('ready').hidden=true;get('form').hidden=false;dialog.showModal();setupGift(item);
+ get('ready').hidden=true;get('form').hidden=false;resetCheckout();dialog.showModal();setupGift(item);
 }
 function notify(msg){get('toast').textContent=msg;get('toast').classList.add('show');clearTimeout(timer);timer=setTimeout(()=>get('toast').classList.remove('show'),1400);}
 function select(view,category=''){closeCatalog();mode=view;group=category;occasion='';get('search').value='';render();if(view==='home')window.scrollTo({top:0});else get('katalog').scrollIntoView({block:'start'});}
@@ -86,9 +86,10 @@ dialog.querySelector('.close').onclick = () => dialog.close();
 dialog.onclose = clearPreview;
 get('form').onsubmit=async e=>{
  e.preventDefault();
+ if(!advanceCheckout())return;
  const file=get('file').files[0],note=get('note').value.trim(),qty=get('qty').value;
  if(file&&file.size>10485760){get('orderError').textContent='10 MB gacha rasm tanlang.';return;}
- const form=new FormData();for(const [key,value] of Object.entries({id:orderId,product:selectedId,qty,note,contact:get('contact').value.trim()}))form.set(key,String(value));
+ const form=new FormData();for(const [key,value] of Object.entries({id:orderId,product:selectedId,qty,note,contact:get('customerName').value.trim()+' · '+get('contact').value.trim()}))form.set(key,String(value));
  if(file)form.set('photo',file,file.name);
  const button=get('submitOrder');if(button.disabled)return;button.disabled=true;button.textContent='Yuborilmoqda…';get('orderError').textContent='';
  const pendingId=orderId;
@@ -108,7 +109,7 @@ get('form').onsubmit=async e=>{
   share.onclick=async()=>{try{await navigator.share({files:[file],text:service+' — '+qty+' dona. '+note});}catch(err){if(err.name!=='AbortError')get('hint').textContent='Ulashish ochilmadi. Surat admin panelda saqlangan.';}};
   get('copy').textContent='Buyurtma matnini nusxalash';get('ready').hidden=false;get('form').hidden=true;dialog.scrollTop=0;
  }catch(err){if(pendingId===orderId)get('orderError').textContent=err.message||'Qayta urinib ko‘ring.';}
- finally{button.disabled=false;button.textContent='Buyurtmani yuborish →';}
+ finally{button.disabled=false;button.textContent=checkoutSubmitLabel();}
 };
 get('copy').onclick = async () => {
   try {await navigator.clipboard.writeText(message);get('copy').textContent='Nusxalandi ✓';}

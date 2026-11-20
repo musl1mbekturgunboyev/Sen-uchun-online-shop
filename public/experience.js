@@ -10,15 +10,21 @@ function paymentPanel(container,token){
  async function refresh(){
   summary.replaceChildren(textNode('p','Yuklanmoqda…'));actions.replaceChildren();
   try{const d=await shopJson('/api/payment',{headers,cache:'no-store'});if(!panel.isConnected)return;
-   summary.replaceChildren(textNode('span',d.status,'payment-status'));
-   const amounts=document.createElement('dl');for(const [label,value] of [['Jami',d.total],['To‘langan',d.received],['Qoldiq',d.balance]]){amounts.append(textNode('dt',label),textNode('dd',value===null?'Kelishiladi':money(value)));}summary.append(amounts);
-   if(d.status!=='To‘langan'){
-    const pay=textNode('button','To‘lov qilish → Sotuvchi','primary');pay.type='button';actions.append(pay);
+   summary.replaceChildren(textNode('span',d.needsAcceptance?(d.total==null?'Narx kutilmoqda':'Narxni tasdiqlang'):d.status,'payment-status'));
+   const amounts=document.createElement('dl');for(const [label,value] of [['Jami',d.total],['To‘langan',d.received],['Qoldiq',d.balance]]){amounts.append(textNode('dt',label),textNode('dd',value===null?'Kelishiladi':money(value)));}if(d.total!=null)summary.append(amounts);else summary.append(textNode('p','Sotuvchi narxni belgilagach, shu yerda tasdiqlaysiz. Hozir to‘lov talab qilinmaydi.'));
+   if(d.needsAcceptance&&d.total!=null){
+    heading.textContent='Taklif qilingan narx';
+    const accept=textNode('button',money(d.total)+' — narxni tasdiqlash','primary');accept.type='button';actions.append(accept);
+    accept.onclick=async()=>{accept.disabled=true;try{await shopJson('/api/payment/accept',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({amount:d.total,revision:d.quoteRevision})});status.textContent='Narx tasdiqlandi. Endi to‘lovni kelishishingiz mumkin.';await refresh();}catch(e){status.textContent='Narx yangilangan bo‘lishi mumkin. Holatni yangilang.';}finally{accept.disabled=false;}};
+   }
+   if(d.status!=='To‘langan'&&(!d.needsAcceptance||d.total==null)){
+    heading.textContent=d.needsAcceptance?'Narxni kelishish':'To‘lov';
+    const pay=textNode('button',d.needsAcceptance?'Narxni so‘rash → Telegram':'To‘lov qilish → Sotuvchi','primary');pay.type='button';actions.append(pay);
     pay.onclick=async()=>{pay.disabled=true;try{const data=await shopJson('/api/telegram/payment',{method:'POST',headers});const a=textNode('a','Telegramda sotuvchiga yozish','primary');a.href=data.url;status.replaceChildren(textNode('p',data.queued?'Buyurtma adminga yuborish navbatiga qo‘yildi. Telegramda matnni yuboring.':'Admin chatida buyurtma matnini yuboring. Bot orqali yuborish hozir sozlanmagan.'),a);location.assign(data.url);}catch(e){status.textContent=e.message;}finally{pay.disabled=false;}};
    }
    const pending=d.receipts.some(r=>r.status==='pending');
    if(pending)actions.append(textNode('p','Chekingiz tekshirilmoqda. Tasdiqlangach summa yangilanadi.','receipt-pending'));
-   else if(d.status!=='To‘langan'){
+   else if(d.status!=='To‘langan'&&!d.needsAcceptance){
     const details=document.createElement('details');details.className='receipt-upload';details.append(textNode('summary','To‘ladim — chekni yuborish'));
     const form=document.createElement('form');form.innerHTML='<label>O‘tkazilgan summa (so‘m)<input name="amount" type="number" min="1" max="1000000000000" step="1" required></label><label>Chek rasmi<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" required></label><small>JPG, PNG yoki WebP, 3 MB gacha. Chekni faqat siz va admin ko‘radi.</small><button class="primary">Chekni yuborish</button>';
     form.elements.amount.value=d.balance>0?d.balance:'';details.append(form);actions.append(details);

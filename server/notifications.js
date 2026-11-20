@@ -56,9 +56,11 @@ async function notificationRoute(request,env,path){
   const o=await trackedOrder(request,env);if(!o)return json({},404);
   const finance=await env.DB.prepare('SELECT agreed_total,received FROM order_finance WHERE order_id=?').bind(o.id).first();
   const gift=o.gift?JSON.parse(o.gift):null,total=finance?.agreed_total??gift?.total??null;
-  const text='Assalomu alaykum! Buyurtma uchun to‘lov qilmoqchiman.\nBuyurtma № '+o.id.slice(0,8)+'\n'+o.product+' — '+o.qty+' dona\nJami: '+(total===null?'Kelishiladi':total+' so‘m')+'\nHolat: '+o.stage+'\n'+(o.note||'');
+  const payment=await paymentSummary(env,o);
+  const purpose=payment.needsAcceptance?'Buyurtma narxini kelishmoqchiman.':'Buyurtma uchun to‘lov qilmoqchiman.';
+  const text='Assalomu alaykum! '+purpose+'\nBuyurtma № '+o.id.slice(0,8)+'\n'+o.product+' — '+o.qty+' dona\nJami: '+(total===null?'Kelishiladi':total+' so‘m')+'\nHolat: '+o.stage+'\n'+(o.note||'');
   const queued=!!(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_ADMIN_CHAT_ID);
-  if(queued)await env.DB.prepare('INSERT OR IGNORE INTO notifications(id,order_id,kind,chat_id,text) VALUES(?,?,?,?,?)').bind('payment:'+o.id,o.id,'new',String(env.TELEGRAM_ADMIN_CHAT_ID),text+'\nMijoz aloqasi: '+(o.contact||'Ko‘rsatilmagan')+'\nBu to‘lov so‘rovi, to‘langanlik tasdig‘i emas.').run();
+  if(queued)await env.DB.prepare('INSERT OR IGNORE INTO notifications(id,order_id,kind,chat_id,text) VALUES(?,?,?,?,?)').bind((payment.needsAcceptance?'quote:':'payment:')+o.id,o.id,'new',String(env.TELEGRAM_ADMIN_CHAT_ID),text+'\nMijoz aloqasi: '+(o.contact||'Ko‘rsatilmagan')+'\nBu to‘lov so‘rovi, to‘langanlik tasdig‘i emas.').run();
   return json({url:'https://t.me/Life_Uz1?text='+encodeURIComponent(text),queued});
  }
  if(path==='/api/telegram/link'&&request.method==='POST'){
