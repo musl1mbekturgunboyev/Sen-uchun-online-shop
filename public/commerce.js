@@ -19,19 +19,25 @@ function reviewCard(review){
  return card;
 }
 async function loadStoreExtras(){
- const results=await Promise.allSettled([fetch('/api/gifts').then(r=>{if(!r.ok)throw Error();return r.json();}),fetch('/api/reviews').then(r=>{if(!r.ok)throw Error();return r.json();})]);
- if(results[0].status==='fulfilled')showDeliveryInfo(get('deliveryInfo'),results[0].value);
- if(results[1].status==='fulfilled'){const data=results[1].value;get('reviewCards').replaceChildren(...data.reviews.slice(0,6).map(reviewCard));get('storeReviews').hidden=!data.reviews.length;}
+ try{const r=await fetch('/api/gifts');if(r.ok)showDeliveryInfo(get('deliveryInfo'),await r.json());}catch{}
 }
 let productExtrasVersion=0;
 async function loadProductExtras(product){
- const version=++productExtrasVersion,container=get('productExtras');container.replaceChildren(textNode('p','Shartlar yuklanmoqda…'));
- try{
-  const [settings,reviews]=await Promise.all([fetch('/api/gifts?product='+product.id).then(r=>{if(!r.ok)throw Error();return r.json();}),fetch('/api/reviews?product='+product.id).then(r=>{if(!r.ok)throw Error();return r.json();})]);
-  if(version!==productExtrasVersion)return;container.replaceChildren();
-  const terms=textNode('div','', 'terms');showDeliveryInfo(terms,settings);container.append(terms);
-  if(reviews.count){const details=document.createElement('details');details.append(textNode('summary','Mijozlar fikrlari · '+Number(reviews.average).toFixed(1)+' / 5 ('+reviews.count+')'));const list=textNode('div','', 'review-grid');list.append(...reviews.reviews.map(reviewCard));details.append(list);container.append(details);}
- }catch{if(version===productExtrasVersion)container.replaceChildren(textNode('p','Shartlarni yuklab bo‘lmadi. Ulanishni tekshirib mahsulotni qayta oching.'));}
+ const version=++productExtrasVersion,container=get('productExtras');container.replaceChildren();
+ const terms=textNode('div','','terms');container.append(terms);
+ fetch('/api/gifts?product='+product.id).then(r=>{if(!r.ok)throw Error();return r.json();}).then(settings=>{if(version===productExtrasVersion)showDeliveryInfo(terms,settings);}).catch(()=>{if(version===productExtrasVersion)terms.textContent='Yetkazish shartlari yuklanmadi.';});
+ const section=textNode('section','','product-reviews'),heading=textNode('h3','Mijozlar fikrlari'),summary=textNode('p',''),list=textNode('div','','review-grid'),status=textNode('p','Yuklanmoqda…'),more=textNode('button','Yana fikrlarni ko‘rish','secondary');
+ more.type='button';more.hidden=true;status.setAttribute('role','status');section.append(heading,summary,list,status,more);container.append(section);
+ let cursor='',busy=false;
+ async function loadReviews(){
+  if(busy)return;busy=true;more.disabled=true;status.textContent='Yuklanmoqda…';
+  try{const r=await fetch('/api/reviews?product='+product.id+(cursor?'&before='+cursor:''));if(!r.ok)throw Error();const data=await r.json();if(version!==productExtrasVersion)return;
+   summary.textContent=data.count?Number(data.average).toFixed(1)+' / 5 · '+data.count+' ta fikr':'Bu mahsulotga hali fikr yozilmagan.';
+   list.append(...data.reviews.map(reviewCard));cursor=data.reviews.at(-1)?.cursor||cursor;more.hidden=!data.more;more.textContent='Yana fikrlarni ko‘rish';status.textContent='';
+  }catch{if(version!==productExtrasVersion)return;status.textContent='Fikrlar yuklanmadi. Qayta urinib ko‘ring.';more.hidden=false;more.textContent='Qayta urinish';}
+  finally{busy=false;more.disabled=false;}
+ }
+ more.onclick=loadReviews;loadReviews();
 }
 function notificationButtons(container,token){
  paymentPanel(container,token);

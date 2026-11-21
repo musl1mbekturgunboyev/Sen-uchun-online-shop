@@ -1,0 +1,11 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const element=()=>({after(){},close(){}});let opened;
+const ctx={URL,URLSearchParams,location:{origin:'https://sen-uchun.uz',href:'https://sen-uchun.uz/?product=7#private-order-token'},document:{createElement:element},get:element,services:[{id:7}],openProduct:p=>opened=p,notify:()=>{},navigator:{}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('public/sharing.js','utf8'),ctx);
+assert.equal(ctx.productShareURL({id:7}),'https://sen-uchun.uz/?product=7');ctx.openSharedProduct();assert.equal(opened.id,7);
+assert.ok(!ctx.productShareURL({id:7}).includes('private'));
+const dir=fs.mkdtempSync('/tmp/sen-domain-');const {spawnSync}=await import('node:child_process');
+fs.writeFileSync(dir+'/wrangler.json',JSON.stringify({name:'sen-uchun',d1_databases:[{binding:'DB',database_id:'keep'}],vars:{EXISTING:'keep'}}));
+const script=fs.realpathSync('scripts/configure-domain.mjs');assert.equal(spawnSync(process.execPath,[script],{cwd:dir}).status,0);
+const config=JSON.parse(fs.readFileSync(dir+'/wrangler.json'));assert.equal(config.d1_databases[0].database_id,'keep');assert.equal(config.vars.EXISTING,'keep');assert.ok(config.vars.STOREFRONT_ORIGINS.split(',').includes('https://sen-uchun.uz'));
+fs.rmSync(dir,{recursive:true});console.log('PASS product deep link, private token exclusion, domain config preserves bindings');

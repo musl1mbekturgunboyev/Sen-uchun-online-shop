@@ -50,6 +50,7 @@ function render(){
  card.querySelector('.add').onclick=()=>{toggle(bag,'bag',id);render();notify(bag.has(id)?'Savatga qo‘shildi':'Savatdan olindi');};
  if(mode==='bag'){const b=document.createElement('button');b.className='primary';b.textContent='Buyurtma berish';b.onclick=()=>showOrder(id);card.append(b);}
  {const label=document.createElement('small');label.className='lead-time';label.textContent=s.lead_time?'◷ '+s.lead_time:'';card.append(label);}
+ const share=document.createElement('button');share.className='card-share';share.type='button';share.textContent='↗ Ulashish';share.setAttribute('aria-label',s.name+' — ulashish');share.onclick=()=>shareProduct(s);card.append(share);
  get('cards').append(card);
  });
  const n=get('cards').children.length;get('total').textContent=n+' ta xizmat';get('empty').hidden=!!n;
@@ -64,7 +65,7 @@ async function init(){
  const data=await r.json();services=data.products.map(p=>({...p,group:p.category,desc:p.description}));
  fetch('/api/session').then(r=>r.json()).then(session=>{if(session.owner){const a=document.createElement('a');a.href='/admin';a.textContent='Boshqaruv';document.querySelector('footer').append(a);}}).catch(()=>{});
  const valid=new Set(services.map(p=>p.id));for(const list of [fav,bag])for(const id of list)if(!valid.has(id))list.delete(id);
- categories();renderOccasions();render();setupBanner();loadStoreExtras();track('view',-1);
+ categories();renderOccasions();render();setupBanner();loadStoreExtras();track('view',-1);openSharedProduct();
 }
 window.addEventListener('DOMContentLoaded',()=>init().catch(()=>{get('cards').replaceChildren();get('cards').setAttribute('aria-busy','false');get('empty').hidden=false;get('empty').textContent='Katalogni yuklab bo‘lmadi. Sahifani yangilang.';}));
 function clearPreview() {

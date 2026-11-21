@@ -4,7 +4,7 @@ function priceText(p){return p.price===null?'Narx kelishiladi':p.price.toLocaleS
 function showPromotion(i){
  const product=services[i];if(!product)return;
  promotion=i;const photo=get('heroPhoto');responsivePhoto(photo,product.id===0&&product.image==='/media/chocolate.webp'?'/media/hero.webp':product.image,'(max-width:620px) 50vw, 730px');
- get('heroName').textContent=product.name;get('heroDesc').textContent=product.desc;
+ get('heroName').textContent=product.name;get('heroDesc').textContent=product.desc.length>180?product.desc.slice(0,180)+'…':product.desc;
  get('heroOrder').onclick=()=>openProduct(product);
  for(const el of [photo,banner.querySelector('.copy')])if(!matchMedia('(prefers-reduced-motion: reduce)').matches)el.animate([{opacity:.3,transform:'translateX(9px)'},{opacity:1,transform:'translateX(0)'}],{duration:480});
  [...get('dots').children].forEach((b,index)=>b.setAttribute('aria-pressed',String(index===i)));
@@ -51,7 +51,7 @@ function showPhoto(index){
  for(const id of ['prev','next','zPrev','zNext'])get(id).hidden=photos.length<2;
 }
 function openProduct(p){
- activeProduct=p;loadProductExtras(p);get('dName').textContent=p.name;get('dText').textContent=p.desc;renderPrice(get('dPrice'),p);get('thumbs').replaceChildren();
+ activeProduct=p;loadProductExtras(p);get('dName').textContent=p.name;setProductDescription(p.desc);renderPrice(get('dPrice'),p);get('thumbs').replaceChildren();
  if(p.images.length>1)p.images.forEach((src,i)=>{const b=document.createElement('button'),img=new Image();img.src=src;img.width=50;img.height=50;img.loading='lazy';img.alt=(i+1)+'-rasm';b.append(img);b.onclick=()=>showPhoto(i);get('thumbs').append(b)});
  showPhoto(0);get('detail').showModal();get('detail').scrollTop=0;
 }
@@ -64,3 +64,10 @@ for(const id of ['detail','zoom']){
 }
 for(const id of ['prev','zPrev'])get(id).onclick=()=>showPhoto(photoIndex-1);
 for(const id of ['next','zNext'])get(id).onclick=()=>showPhoto(photoIndex+1);
+
+function setProductDescription(description){
+ const text=get('dText');text.textContent=description;
+ let toggle=get('descriptionToggle');if(!toggle){toggle=document.createElement('button');toggle.id='descriptionToggle';toggle.type='button';toggle.className='secondary';toggle.setAttribute('aria-controls','dText');text.after(toggle);}
+ const long=description.length>600;text.classList.toggle('description-collapsed',long);toggle.hidden=!long;toggle.textContent='Tavsifni to‘liq o‘qish';toggle.setAttribute('aria-expanded','false');
+ toggle.onclick=()=>{const collapsed=text.classList.toggle('description-collapsed');toggle.textContent=collapsed?'Tavsifni to‘liq o‘qish':'Qisqartirish';toggle.setAttribute('aria-expanded',String(!collapsed));};
+}

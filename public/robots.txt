@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /api/
-Sitemap: https://sen-uchun-onlineshop.netlify.app/sitemap.xml
+Sitemap: https://sen-uchun.uz/sitemap.xml

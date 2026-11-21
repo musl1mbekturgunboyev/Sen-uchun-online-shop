@@ -33,7 +33,7 @@ async function dispatch(request,env){
  if((p==='/admin'||p.startsWith('/api/admin'))&&!owner)return new Response('Topilmadi',{status:404,headers:noCache});
  if(p==='/api/telegram/webhook')return telegramWebhook(request,env);
  const origin=request.headers.get('Origin');
- const trustedStorefront=standalone && !!env.STOREFRONT_ORIGIN && origin===env.STOREFRONT_ORIGIN;
+ const trustedStorefront=standalone && [env.STOREFRONT_ORIGIN,...String(env.STOREFRONT_ORIGINS||'').split(',')].filter(Boolean).map(v=>v.trim()).includes(origin);
  if(method==='POST' && origin!==url.origin && !trustedStorefront)return json({error:'Ruxsat yo‘q'},403);
  if(['/api/storefront','/api/admin/storefront','/api/recovery','/api/recovery/logout','/api/payment','/api/payment/accept','/api/payment/receipt','/api/admin/receipts','/api/admin/receipt'].includes(p))return experienceRoute(request,env,p);
  if(['/api/admin/product-details','/api/reviews','/api/reviews/submit','/api/admin/reviews','/api/admin/review','/api/admin/finance','/api/admin/export'].includes(p)||p.startsWith('/review-photo/'))return commerceRoute(request,env,p);
@@ -80,9 +80,9 @@ async function dispatch(request,env){
   return json({products,stats});
  }
  if(p==='/api/admin/product'&&method==='POST'){
-  let raw;try{raw=await (await limitedBody(request,1850000)).text();}catch{return json({},413);}if(raw.length>1850000)return json({error:'Rasm hajmi katta'},413);
+  let raw;try{raw=await (await limitedBody(request,1850000)).text();}catch{return json({error:'Mahsulot matni va rasmlarining umumiy hajmi juda katta. Rasmlarni kichraytirib qayta saqlang.'},413);}
   let v;try{v=JSON.parse(raw)}catch{return json({},400)}
-  if(!v||![['name',100],['description',350],['category',60]].every(([key,max])=>typeof v[key]==='string'&&v[key].trim().length>0&&v[key].length<=max)||!(v.price===null||Number.isSafeInteger(v.price)&&v.price>=0&&v.price<=1e12)||![0,1].includes(v.visible))return json({error:'Maydonlarni tekshiring'},400);
+  if(!v||![['name',100],['category',60]].every(([key,max])=>typeof v[key]==='string'&&v[key].trim().length>0&&v[key].length<=max)||typeof v.description!=='string'||!v.description.trim()||!(v.price===null||Number.isSafeInteger(v.price)&&v.price>=0&&v.price<=1e12)||![0,1].includes(v.visible))return json({error:'Maydonlarni tekshiring'},400);
   v.sale_price=v.sale_price??null;
   if(v.sale_price!==null&&(!integer(v.sale_price,0,1e12)||v.price===null||v.sale_price>=v.price))return json({error:'Chegirma narxi asosiy narxdan kichik bo‘lishi kerak.'},400);
   const images=v.images??[v.image];

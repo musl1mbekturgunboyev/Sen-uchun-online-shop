@@ -24,9 +24,10 @@ async function commerceRoute(request,env,path){
  if(path==='/api/reviews'&&method==='GET'){
   const product=url.searchParams.get('product');if(product!==null&&!/^\d{1,9}$/.test(product))return json({},400);
   const where="status='published'"+(product===null?'':' AND product_id=?'),args=product===null?[]:[Number(product)];
-  const rows=await env.DB.prepare('SELECT id,product,name,rating,text,created,CASE WHEN photo_key IS NULL THEN NULL ELSE \'/review-photo/\'||id END AS photo FROM reviews WHERE '+where+' ORDER BY created DESC LIMIT 12').bind(...args).all();
+  const before=url.searchParams.get('before')||'9223372036854775807';if(!/^\d{1,19}$/.test(before))return json({},400);
+  const rows=await env.DB.prepare("SELECT rowid AS cursor,id,product,name,rating,text,created,CASE WHEN photo_key IS NULL THEN NULL ELSE '/review-photo/'||id END AS photo FROM reviews WHERE "+where+' AND rowid<CAST(? AS INTEGER) ORDER BY rowid DESC LIMIT 13').bind(...args,before).all();
   const summary=await env.DB.prepare('SELECT COUNT(*) AS count,AVG(rating) AS average FROM reviews WHERE '+where).bind(...args).first();
-  return json({reviews:rows.results,...summary});
+  return json({reviews:rows.results.slice(0,12),more:rows.results.length>12,...summary});
  }
  if(/^\/review-photo\/[a-f0-9-]{36}$/.test(path)&&method==='GET'){
   const row=await env.DB.prepare("SELECT photo_key,mime FROM reviews WHERE id=? AND status='published'").bind(path.split('/').pop()).first();
